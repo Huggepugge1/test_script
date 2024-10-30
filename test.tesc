@@ -1,8 +1,8 @@
 test1(input_test) {
-    input("\d{2}");
-    output("\d{2}");
-    input("\w");
-    output("\w");
+    input("\d{2}\w");
+    output("\d{2}\w");
+    input("a");
+    output("a");
 }
 
 test2(input_test) {

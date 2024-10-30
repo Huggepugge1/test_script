@@ -26,9 +26,12 @@ impl Test {
 
     fn run_test(&mut self, input: Vec<&String>, output: Vec<String>) -> Result<(), ()> {
         let mut process = Process::spawn(self.file.clone()).expect("Failed to run test");
+        let mut buffer = String::new();
         for line in input {
-            process.sendline(&line).expect("Failed to send input");
+            buffer.push_str(line);
+            buffer.push('\n');
         }
+        process.send(&buffer).expect("Failed to send input");
 
         let lines = process.get_lines().expect("Failed to get output");
         for (i, line) in lines.iter().enumerate() {
@@ -128,10 +131,9 @@ impl Process {
         Ok(Process { child })
     }
 
-    fn sendline(&mut self, input: &str) -> Result<(), Error> {
+    fn send(&mut self, input: &str) -> Result<(), Error> {
         if let Some(stdin) = self.child.stdin.as_mut() {
             stdin.write_all(input.as_bytes())?;
-            stdin.write_all(b"\n")?; // Send newline to simulate "Enter" key
         }
         Ok(())
     }
@@ -144,7 +146,6 @@ impl Process {
             )
         })?;
 
-        // Use a buffered reader for non-blocking line-by-line reading
         let mut reader = BufReader::new(stdout);
         let mut output = Vec::new();
 

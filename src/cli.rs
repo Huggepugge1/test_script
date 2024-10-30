@@ -9,7 +9,7 @@ pub struct Args {
     #[clap(index = 1)]
     pub file: PathBuf,
 
-    #[clap(short, long, default_value = "2")]
+    #[clap(short, long, default_value = "3")]
     pub max_size: u32,
 }
 
