@@ -1,4 +1,4 @@
-use crate::parser::{BuiltIn, Instruction};
+use crate::parser::{BuiltIn, Instruction, InstructionType};
 
 use itertools::Itertools;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
@@ -109,10 +109,10 @@ impl Test {
     }
 
     fn interpret_expression(&mut self, instruction: Instruction) -> Vec<String> {
-        match instruction {
-            Instruction::Literal(value) => self.interpret_literal(value),
-            Instruction::BuiltIn(builtin) => self.interpret_builtin(builtin),
-            Instruction::None => Vec::new(),
+        match instruction.r#type {
+            InstructionType::Literal(value) => self.interpret_literal(value),
+            InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin),
+            InstructionType::None => Vec::new(),
             _ => panic!("Unexpected instruction {:?}", instruction),
         }
     }
@@ -167,8 +167,8 @@ impl Process {
 }
 
 fn interpret_test(test: Instruction) {
-    match test {
-        Instruction::Test(expressions, name, file) => {
+    match test.r#type {
+        InstructionType::Test(expressions, name, file) => {
             let mut test = Test::new(name, file, expressions);
             test.run();
         }

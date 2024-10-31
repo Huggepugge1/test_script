@@ -1,6 +1,7 @@
 test1(input_test) {
-    input("\d{2}\w");
-    output("\d{2}\w");
+    "aoetuhanoehu";
+    input("\d{3}");
+    output("\d{3}");
     input("a");
     output("a");
 }

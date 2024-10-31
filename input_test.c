@@ -3,8 +3,8 @@
 
 int main() {
     char *a = malloc(sizeof(char) * 100);
-    scanf("%s", a);
-    printf("%s\n", a);
-    scanf("%s", a);
-    printf("%s\n", a);
+    while (1) {
+        scanf("%s", a);
+        printf("%s\n", a);
+    }
 }
