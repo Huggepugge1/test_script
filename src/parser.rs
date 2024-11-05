@@ -1,4 +1,5 @@
-use crate::lexer::{Token, TokenType};
+use crate::error::{ParseError, ParseErrorType};
+use crate::lexer::{Token, TokenCollection, TokenType};
 use crate::regex;
 use std::path::PathBuf;
 
@@ -38,194 +39,323 @@ pub enum InstructionType {
     None,
 }
 
-fn parse_literal(
-    _tokens: &mut impl Iterator<Item = Token>,
-    token: Token,
-    max_size: u32,
-) -> Instruction {
-    if token.value == "" {
-        Instruction::new(InstructionType::None, 0, 0)
+fn parse_literal(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap();
+    if token.r#type != TokenType::Literal {
+        while let Some(token) = tokens.clone().next() {
+            if token.r#type == TokenType::SemiColon {
+                break;
+            }
+        }
+        Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Not a literal",
+            None::<String>,
+        ))
     } else {
-        Instruction::new(
+        Ok(Instruction::new(
             InstructionType::Literal(regex::parse(&token.value, max_size)),
             token.line,
             token.column,
-        )
+        ))
     }
 }
 
 fn parse_identifier(
-    tokens: &mut impl Iterator<Item = Token>,
-    token: Token,
+    tokens: &mut TokenCollection,
     max_size: u32,
-) -> Instruction {
-    if token.value == "input" || token.value == "output" {
-        if let Some(token) = tokens.next() {
-            if token.r#type != TokenType::OpenParen {
-                panic!(
-                    "Expected {:?}, {}:{}",
-                    token.value, token.line, token.column
-                );
+) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap().clone();
+
+    let mut next_token = tokens.next();
+    if next_token.is_some() {
+        let token = next_token.unwrap().clone();
+        if token.r#type != TokenType::OpenParen {
+            while let Some(token) = tokens.next() {
+                if token.r#type == TokenType::SemiColon {
+                    break;
+                }
             }
+            return Err(ParseError::new(
+                ParseErrorType::Error,
+                token,
+                "Unexpected token",
+                Some("Expected \"(\""),
+            ));
         }
-        if let Some(next_token) = tokens.next() {
-            match next_token.r#type {
-                TokenType::Literal => {
-                    if let Some(token) = tokens.next() {
-                        if token.r#type != TokenType::CloseParen {
-                            panic!(
-                                "Expected {:?}, {}:{}",
-                                token.value, token.line, token.column
-                            );
+    }
+    next_token = tokens.next();
+    if next_token.is_some() {
+        let next_token = next_token.unwrap().clone();
+        match next_token.clone().r#type {
+            TokenType::Literal => {
+                let literal = Box::new(parse_literal(tokens, max_size)?);
+                let next_token = tokens.peek();
+                if next_token.is_some() {
+                    let next_token = next_token.unwrap().clone();
+                    if next_token.r#type != TokenType::CloseParen {
+                        let _ = tokens.next();
+                        while let Some(next_token) = tokens.next() {
+                            if next_token.r#type == TokenType::SemiColon {
+                                break;
+                            }
                         }
-                    }
-                    let literal = Box::new(parse_literal(tokens, next_token, max_size));
-                    match token.value.as_str() {
-                        "input" => Instruction::new(
-                            InstructionType::BuiltIn(BuiltIn::Input(literal)),
-                            token.line,
-                            token.column,
-                        ),
-                        "output" => Instruction::new(
-                            InstructionType::BuiltIn(BuiltIn::Output(literal)),
-                            token.line,
-                            token.column,
-                        ),
-                        _ => panic!(
-                            "Unexpected token {:?}, {}:{}",
-                            token.value, token.line, token.column
-                        ),
+                        return Err(ParseError::new(
+                            ParseErrorType::Error,
+                            next_token,
+                            "Unexpected token",
+                            Some("Expected \")\""),
+                        ));
+                    } else {
+                        let _ = tokens.next();
                     }
                 }
-                _ => panic!(
-                    "Unexpected token {:?}, {}:{}",
-                    next_token.value, next_token.line, next_token.column
-                ),
+                match token.value.as_str() {
+                    "input" => Ok(Instruction::new(
+                        InstructionType::BuiltIn(BuiltIn::Input(literal)),
+                        token.line,
+                        token.column,
+                    )),
+                    "output" => Ok(Instruction::new(
+                        InstructionType::BuiltIn(BuiltIn::Output(literal)),
+                        token.line,
+                        token.column,
+                    )),
+                    _ => {
+                        while let Some(token) = tokens.next() {
+                            if token.r#type == TokenType::SemiColon {
+                                break;
+                            }
+                        }
+                        Err(ParseError::new(
+                            ParseErrorType::Error,
+                            token,
+                            "Unexpected identifier",
+                            None::<String>,
+                        ))
+                    }
+                }
             }
-        } else {
-            panic!("Unexpected end of input")
+            _ => {
+                while let Some(token) = tokens.next() {
+                    if token.r#type == TokenType::SemiColon {
+                        break;
+                    }
+                }
+                Err(ParseError::new(
+                    ParseErrorType::Error,
+                    next_token.clone(),
+                    "Unexpected token",
+                    None::<String>,
+                ))
+            }
         }
     } else {
-        panic!(
-            "Unexpected identifier {:?}, {}:{}",
-            token.value, token.line, token.column
-        );
+        while let Some(token) = tokens.next() {
+            if token.r#type == TokenType::SemiColon {
+                break;
+            }
+        }
+        Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Unexpected end of input",
+            None::<String>,
+        ))
     }
 }
 
-fn parse_test(
-    tokens: &mut impl Iterator<Item = Token>,
-    token: Token,
-    max_size: u32,
-) -> Instruction {
+fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
     let mut current = Instruction::new(InstructionType::None, 0, 0);
     let mut block = Vec::new();
+    let mut failed = false;
+    let token = tokens.current().unwrap().clone();
     if let Some(token) = tokens.next() {
         if token.r#type != TokenType::OpenParen {}
     } else {
-        panic!("Unexpected end of input")
+        return Err(ParseError::new(
+            ParseErrorType::Error,
+            token,
+            "Unexpected end of input",
+            None::<String>,
+        ));
     }
 
     let file = if let Some(token) = tokens.next() {
         if token.r#type != TokenType::Literal {
-            panic!(
-                "Expected filename literal, found {:?}, {}:{}",
-                token.value, token.line, token.column
-            );
+            return Err(ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Unexpected token",
+                Some("Expected file path as a literal"),
+            ));
         }
 
         PathBuf::from("./".to_string() + &token.value)
     } else {
-        panic!("Unexpected end of input")
+        return Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Unexpected end of input",
+            Some("Expected file path as a literal"),
+        ));
     };
 
     if let Some(token) = tokens.next() {
         if token.r#type != TokenType::CloseParen {
-            panic!(
-                "Expected ), found {:?}, {}:{}",
-                token, token.line, token.column
-            );
+            return Err(ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Unexpected Token",
+                Some("Expected \")\""),
+            ));
         }
     } else {
-        panic!("Unexpected end of input");
+        return Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Unexpected end of input",
+            None::<String>,
+        ));
     }
 
     if let Some(token) = tokens.next() {
         if token.r#type != TokenType::OpenBlock {
-            panic!(
-                "Expected {{, found {:?}, {}:{}",
-                token, token.line, token.column
-            );
+            return Err(ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Unexpected Token",
+                Some("Expected \"{\""),
+            ));
         }
     } else {
-        panic!("Unexpected end of input");
+        return Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Unexpected end of input",
+            Some("Expected \"{\""),
+        ));
     }
 
     while let Some(token) = tokens.next() {
         match token.r#type {
             TokenType::Literal => {
-                eprintln!(
-                    "Warning: Ignoring literal {:?}, {}:{}",
-                    token.value, token.line, token.column
-                );
-                current = parse_literal(tokens, token, max_size);
+                ParseError::new(
+                    ParseErrorType::Warning,
+                    token.clone(),
+                    "Ignoring Literal",
+                    Some("Remove the literal"),
+                )
+                .print();
             }
             TokenType::Identifier => {
                 if current.r#type == InstructionType::None {
-                    current = parse_identifier(tokens, token, max_size);
+                    current = parse_identifier(tokens, max_size)?;
                 } else {
-                    panic!(
-                        "Unexpected token {:?}, {}:{}",
-                        token.value, token.line, token.column
-                    );
+                    ParseError::new(
+                        ParseErrorType::Error,
+                        token.clone(),
+                        "Unexpected token",
+                        Some("Did you forget a semicolon?"),
+                    )
+                    .print();
+                    failed = true;
+                    let token = token.clone();
+                    tokens.insert(Token::new(
+                        TokenType::SemiColon,
+                        &"".to_string(),
+                        token.line,
+                        token.column,
+                    ));
                 }
             }
-            TokenType::OpenBlock => panic!(
-                "Blocks not supported {:?}, {}:{}",
-                token.value, token.line, token.column
-            ),
+            TokenType::OpenBlock => ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Blocks not supported",
+                None::<String>,
+            )
+            .print(),
+
             TokenType::CloseBlock => break,
-            TokenType::OpenParen => panic!(
-                "Parens not supported {:?}, {}:{}",
-                token.value, token.line, token.column
-            ),
-            TokenType::CloseParen => panic!(
-                "Parens not supported {:?}, {}:{}",
-                token.value, token.line, token.column
-            ),
+            TokenType::OpenParen => ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Parens not supported",
+                None::<String>,
+            )
+            .print(),
+
+            TokenType::CloseParen => ParseError::new(
+                ParseErrorType::Error,
+                token.clone(),
+                "Parens not supported",
+                None::<String>,
+            )
+            .print(),
             TokenType::SemiColon => {
                 if current.r#type == InstructionType::None {
-                    eprintln!(
-                        "Warning: unecessary {:?}, {}:{}",
-                        token.value, token.line, token.column
-                    );
+                    ParseError::new(
+                        ParseErrorType::Warning,
+                        token.clone(),
+                        "Extra semicolon",
+                        Some("Remove the semicolon"),
+                    )
+                    .print();
                 }
                 block.push(current.clone());
                 current = Instruction::NONE;
             }
         }
     }
-    Instruction::new(
-        InstructionType::Test(block, token.value, file),
-        token.line,
-        token.column,
-    )
+    if failed {
+        Err(ParseError::new(
+            ParseErrorType::Error,
+            token.clone(),
+            "Failed to parse test",
+            None::<String>,
+        ))
+    } else {
+        Ok(Instruction::new(
+            InstructionType::Test(block, token.value, file),
+            token.line,
+            token.column,
+        ))
+    }
 }
 
-pub fn parse(tokens: Vec<Token>, max_size: u32) -> Vec<Instruction> {
-    let mut tokens = tokens.into_iter();
+pub fn parse(tokens: &mut TokenCollection, max_size: u32) -> Result<Vec<Instruction>, ()> {
     let mut program = Vec::new();
+    let mut failed = false;
     while let Some(token) = tokens.next() {
         match token.r#type {
             TokenType::Identifier => {
-                program.push(parse_test(&mut tokens, token, max_size));
+                let instruction = parse_test(tokens, max_size);
+                match instruction {
+                    Ok(instruction) => program.push(instruction),
+                    Err(message) => {
+                        message.print();
+                        failed = true;
+                    }
+                }
             }
-            other => panic!(
-                "Unexpected token {:?}, {}:{}",
-                other, token.line, token.column
-            ),
+            _ => {
+                ParseError::new(
+                    ParseErrorType::Error,
+                    token.clone(),
+                    "Unexpected token",
+                    Some("Expected a test block"),
+                )
+                .print();
+                failed = true;
+            }
         }
     }
 
-    program
+    if failed {
+        Err(())
+    } else {
+        Ok(program)
+    }
 }

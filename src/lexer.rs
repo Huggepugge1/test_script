@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     Literal,
     Identifier,
@@ -9,7 +9,7 @@ pub enum TokenType {
     SemiColon,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub r#type: TokenType,
     pub value: String,
@@ -28,8 +28,61 @@ impl Token {
     }
 }
 
-pub fn tokenize(contents: String) -> Vec<Token> {
-    let mut tokens = Vec::new();
+#[derive(Debug, Clone)]
+pub struct TokenCollection {
+    pub tokens: Vec<Token>,
+    pub index: usize,
+    pub started: bool,
+}
+
+impl TokenCollection {
+    pub fn new(tokens: Vec<Token>) -> TokenCollection {
+        TokenCollection {
+            tokens,
+            index: 0,
+            started: false,
+        }
+    }
+
+    pub fn current(&self) -> Option<&Token> {
+        if self.started {
+            self.tokens.get(self.index)
+        } else {
+            None
+        }
+    }
+
+    pub fn next(&mut self) -> Option<&Token> {
+        if !self.started {
+            self.started = true;
+            self.tokens.get(self.index)
+        } else {
+            self.index += 1;
+            self.tokens.get(self.index)
+        }
+    }
+
+    pub fn peek(&mut self) -> Option<&Token> {
+        if !self.started {
+            self.started = true;
+            self.tokens.get(self.index)
+        } else {
+            self.tokens.get(self.index + 1)
+        }
+    }
+
+    pub fn insert(&mut self, token: Token) {
+        self.tokens.insert(self.index, token);
+        self.index -= 1;
+    }
+
+    pub fn push(&mut self, token: Token) {
+        self.tokens.push(token);
+    }
+}
+
+pub fn tokenize(contents: String) -> TokenCollection {
+    let mut tokens = TokenCollection::new(Vec::new());
     let mut current = String::new();
     let mut i = 0;
     let mut line = 1;

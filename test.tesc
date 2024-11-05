@@ -1,7 +1,7 @@
 test1("./input_test") {
     input("\d{2}");
-    output("\d{2}");
-    input("a");
+    output("\d{2}")
+    in("a");
     output("a");
 }
 
