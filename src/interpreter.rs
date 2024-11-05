@@ -34,9 +34,13 @@ impl Test {
         process.send(&buffer).expect("Failed to send input");
 
         let lines = process.get_lines().expect("Failed to get output");
+
         for (i, line) in lines.iter().enumerate() {
             if *line != output[i] {
-                self.fail(&format!("Expected output: {}, got: {}", output[i], line));
+                self.fail(&format!(
+                    "Expected output: {:?}, got: {:?}",
+                    output[i], line
+                ));
                 return Err(());
             }
         }
@@ -89,7 +93,17 @@ impl Test {
     }
 
     fn output(&mut self, value: Vec<String>) -> Vec<String> {
-        self.output.push(value.clone());
+        let mut result: Vec<Vec<String>> =
+            vec![Vec::new(); value[0].chars().filter(|e| e == &'\n').count() + 1];
+        for output in value.iter() {
+            for (i, line) in output.split('\n').enumerate() {
+                result[i].push(line.to_string());
+            }
+        }
+
+        for i in result {
+            self.output.push(i);
+        }
         value
     }
 

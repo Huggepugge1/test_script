@@ -62,8 +62,8 @@ pub fn tokenize(contents: String) -> Vec<Token> {
             ')' => tokens.push(Token::new(TokenType::CloseParen, &current, line, column)),
             '"' => {
                 current.pop();
-                let start_column = column;
                 let start_line = line;
+                let start_column = column;
                 while i + 1 < contents.len() {
                     let next = contents.chars().nth(i + 1).unwrap();
                     i += 1;
@@ -89,10 +89,10 @@ pub fn tokenize(contents: String) -> Vec<Token> {
             ';' => tokens.push(Token::new(TokenType::SemiColon, &current, line, column)),
             '\n' => {
                 line += 1;
-                column = 0;
+                column = 1;
             }
-            ' ' => (),
-            _ => panic!("Unexpected character: {}", c),
+            ' ' | '\t' => (),
+            _ => panic!("Unexpected character: \"{:?}\"", c),
         }
         current = String::new();
         column += 1;

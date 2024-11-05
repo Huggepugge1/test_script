@@ -40,16 +40,16 @@ pub enum InstructionType {
 
 fn parse_literal(
     _tokens: &mut impl Iterator<Item = Token>,
-    value: String,
+    token: Token,
     max_size: u32,
 ) -> Instruction {
-    if value == "" {
+    if token.value == "" {
         Instruction::new(InstructionType::None, 0, 0)
     } else {
         Instruction::new(
-            InstructionType::Literal(regex::parse(&value, max_size)),
-            0,
-            0,
+            InstructionType::Literal(regex::parse(&token.value, max_size)),
+            token.line,
+            token.column,
         )
     }
 }
@@ -79,8 +79,7 @@ fn parse_identifier(
                             );
                         }
                     }
-                    let literal =
-                        Box::new(parse_literal(tokens, next_token.value.clone(), max_size));
+                    let literal = Box::new(parse_literal(tokens, next_token, max_size));
                     match token.value.as_str() {
                         "input" => Instruction::new(
                             InstructionType::BuiltIn(BuiltIn::Input(literal)),
@@ -128,9 +127,9 @@ fn parse_test(
     }
 
     let file = if let Some(token) = tokens.next() {
-        if token.r#type != TokenType::Identifier {
+        if token.r#type != TokenType::Literal {
             panic!(
-                "Expected filename, found {:?}, {}:{}",
+                "Expected filename literal, found {:?}, {}:{}",
                 token.value, token.line, token.column
             );
         }
@@ -169,7 +168,7 @@ fn parse_test(
                     "Warning: Ignoring literal {:?}, {}:{}",
                     token.value, token.line, token.column
                 );
-                current = parse_literal(tokens, token.value, max_size);
+                current = parse_literal(tokens, token, max_size);
             }
             TokenType::Identifier => {
                 if current.r#type == InstructionType::None {

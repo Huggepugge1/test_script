@@ -60,9 +60,11 @@ fn parse_kind(kind: hir::HirKind, max: u32) -> Vec<String> {
                 if result.is_empty() {
                     result.append(&mut sub_class);
                 } else {
-                    for i in 0..result.len() {
+                    let old_result = result.clone();
+                    result.clear();
+                    for i in old_result {
                         for sub in sub_class.iter() {
-                            let joined = format!("{}{}", result[i], sub);
+                            let joined = format!("{}{}", i, sub);
                             result.push(joined);
                         }
                     }
