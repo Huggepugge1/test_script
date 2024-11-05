@@ -1,8 +1,4 @@
 test1("input_test") {
-    for reg in /[^\d]*/ {
-        input(reg);
-        output(reg);
-    }
     input("a");
     output("a");
 }

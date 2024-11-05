@@ -1,164 +1,79 @@
-#[derive(Debug, PartialEq, Clone)]
-pub enum TokenType {
-    Literal,
-    Identifier,
-    Keyword,
-    OpenBlock,
-    CloseBlock,
-    OpenParen,
-    CloseParen,
-    SemiColon,
-}
+use crate::token::{Token, TokenCollection, TokenType};
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    pub r#type: TokenType,
-    pub value: String,
-    pub line: u32,
-    pub column: u32,
-}
-
-impl Token {
-    pub fn new(r#type: TokenType, value: &String, line: u32, column: u32) -> Token {
-        Token {
-            r#type,
-            value: value.to_string(),
-            line,
-            column,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TokenCollection {
-    pub tokens: Vec<Token>,
-    pub index: usize,
-    pub started: bool,
-}
-
-impl TokenCollection {
-    pub fn new(tokens: Vec<Token>) -> TokenCollection {
-        TokenCollection {
-            tokens,
-            index: 0,
-            started: false,
-        }
-    }
-
-    pub fn current(&self) -> Option<&Token> {
-        if self.started {
-            self.tokens.get(self.index)
-        } else {
-            None
-        }
-    }
-
-    pub fn next(&mut self) -> Option<&Token> {
-        if !self.started {
-            self.started = true;
-            self.tokens.get(self.index)
-        } else {
-            self.index += 1;
-            self.tokens.get(self.index)
-        }
-    }
-
-    pub fn peek(&mut self) -> Option<&Token> {
-        if !self.started {
-            self.started = true;
-            self.tokens.get(self.index)
-        } else {
-            self.tokens.get(self.index + 1)
-        }
-    }
-
-    pub fn insert(&mut self, token: Token) {
-        self.tokens.insert(self.index, token);
-        self.index -= 1;
-    }
-
-    pub fn push(&mut self, token: Token) {
-        self.tokens.push(token);
-    }
-}
-
-fn is_keyword(value: &String) -> bool {
+fn identifier_type(value: &String) -> TokenType {
     match value.as_str() {
-        "for" => true,
-        _ => false,
+        "for" => TokenType::Keyword,
+        "input" | "output" => TokenType::BuiltIn,
+        _ => TokenType::Identifier,
     }
+}
+
+pub fn tokenize_identifier(
+    contents: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    line: u32,
+    column: &mut u32,
+) -> Token {
+    let start_column = column.clone();
+    let mut current = String::new();
+    while let Some(next) = contents.peek() {
+        if !(next.is_alphanumeric() || *next == '_') {
+            break;
+        }
+        current.push(*next);
+        contents.next();
+        *column += 1;
+    }
+
+    Token::new(identifier_type(&current), &current, line, start_column)
+}
+
+pub fn tokenize_string_literal(
+    contents: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    line: &mut u32,
+    column: &mut u32,
+) -> Token {
+    let start_line = line.clone();
+    let start_column = column.clone();
+
+    let mut current = String::new();
+    while let Some(next) = contents.peek() {
+        if *next == '\n' {
+            *line += 1;
+            *column = 1;
+        }
+        if *next == '"' {
+            break;
+        }
+        current.push(*next);
+        contents.next();
+        *column += 1;
+    }
+
+    Token::new(TokenType::Literal, &current, start_line, start_column)
 }
 
 pub fn tokenize(contents: String) -> TokenCollection {
     let mut tokens = TokenCollection::new(Vec::new());
     let mut current = String::new();
-    let mut i = 0;
     let mut line = 1;
     let mut column = 1;
-    while i < contents.len() {
-        let c = contents.chars().nth(i).unwrap();
-        current.push(c);
+
+    let mut contents = contents.chars().peekable();
+    while let Some(c) = contents.peek() {
+        current.push(*c);
         match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
-                let start_column = column;
-                while i + 1 < contents.len() {
-                    let next = contents.chars().nth(i + 1).unwrap();
-                    if !(next.is_alphanumeric() || next == '_') {
-                        break;
-                    }
-                    current.push(next);
-                    i += 1;
-                    column += 1;
-                }
-
-                if is_keyword(&current) {
-                    tokens.push(Token::new(TokenType::Keyword, &current, line, start_column));
-                } else {
-                    tokens.push(Token::new(
-                        TokenType::Identifier,
-                        &current,
-                        line,
-                        start_column,
-                    ));
-                }
-
-                tokens.push(Token::new(
-                    TokenType::Identifier,
-                    &current,
-                    line,
-                    start_column,
-                ));
+                tokens.push(tokenize_identifier(&mut contents, line, &mut column))
             }
             '{' => tokens.push(Token::new(TokenType::OpenBlock, &current, line, column)),
             '}' => tokens.push(Token::new(TokenType::CloseBlock, &current, line, column)),
             '(' => tokens.push(Token::new(TokenType::OpenParen, &current, line, column)),
             ')' => tokens.push(Token::new(TokenType::CloseParen, &current, line, column)),
-            '"' => {
-                current.pop();
-                let start_line = line;
-                let start_column = column;
-                while i + 1 < contents.len() {
-                    let next = contents.chars().nth(i + 1).unwrap();
-                    i += 1;
-                    if next == '"' {
-                        break;
-                    }
-                    if next == '\n' {
-                        line += 1;
-                        column = 1;
-                    } else {
-                        column += 1;
-                    }
-                    current.push(next);
-                }
-
-                tokens.push(Token::new(
-                    TokenType::Literal,
-                    &current,
-                    start_line,
-                    start_column,
-                ));
-            }
+            '"' => tokens.push(tokenize_string_literal(
+                &mut contents,
+                &mut line,
+                &mut column,
+            )),
             ';' => tokens.push(Token::new(TokenType::SemiColon, &current, line, column)),
             '\n' => {
                 line += 1;
@@ -169,7 +84,7 @@ pub fn tokenize(contents: String) -> TokenCollection {
         }
         current = String::new();
         column += 1;
-        i += 1;
+        contents.next();
     }
 
     tokens
