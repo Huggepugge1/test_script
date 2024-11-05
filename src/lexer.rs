@@ -145,7 +145,7 @@ pub fn tokenize(contents: String) -> TokenCollection {
                 column = 1;
             }
             ' ' | '\t' => (),
-            _ => panic!("Unexpected character: \"{:?}\"", c),
+            _ => panic!("Unexpected character: \"{}\"", c),
         }
         current = String::new();
         column += 1;

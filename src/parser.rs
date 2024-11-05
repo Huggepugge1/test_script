@@ -40,9 +40,10 @@ pub enum InstructionType {
 }
 
 fn parse_literal(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
-    let token = tokens.current().unwrap();
+    let token = tokens.current();
+    let token = token.unwrap().clone();
     if token.r#type != TokenType::Literal {
-        while let Some(token) = tokens.clone().next() {
+        while let Some(token) = tokens.next() {
             if token.r#type == TokenType::SemiColon {
                 break;
             }
@@ -251,7 +252,13 @@ fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction
             }
             TokenType::Identifier => {
                 if current.r#type == InstructionType::None {
-                    current = parse_identifier(tokens, max_size)?;
+                    match parse_identifier(tokens, max_size) {
+                        Ok(instruction) => current = instruction,
+                        Err(message) => {
+                            message.print();
+                            failed = true;
+                        }
+                    }
                 } else {
                     ParseError::new(
                         ParseErrorType::Error,
@@ -264,7 +271,7 @@ fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction
                     let token = token.clone();
                     tokens.insert(Token::new(
                         TokenType::SemiColon,
-                        &"".to_string(),
+                        &";".to_string(),
                         token.line,
                         token.column,
                     ));
@@ -278,7 +285,19 @@ fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction
             )
             .print(),
 
-            TokenType::CloseBlock => break,
+            TokenType::CloseBlock => {
+                if current.r#type != InstructionType::None {
+                    ParseError::new(
+                        ParseErrorType::Error,
+                        token.clone(),
+                        "Unexpected token",
+                        Some("Did you forget a semicolon?"),
+                    )
+                    .print();
+                    failed = true;
+                }
+                break;
+            }
             TokenType::OpenParen => ParseError::new(
                 ParseErrorType::Error,
                 token.clone(),
