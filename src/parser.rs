@@ -36,6 +36,7 @@ pub enum InstructionType {
     Literal(Vec<String>),
     BuiltIn(BuiltIn),
     Test(Vec<Instruction>, String, PathBuf),
+    For(Vec<Instruction>, Vec<String>),
     None,
 }
 
@@ -167,6 +168,102 @@ fn parse_identifier(
     }
 }
 
+fn parse_keyword(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap().clone();
+    match token.value.as_str() {
+        "for" => {
+            let mut current = Instruction::new(InstructionType::None, 0, 0);
+            let mut block = Vec::new();
+            let mut failed = false;
+            let mut variables = Vec::new();
+            let token = tokens.current().unwrap().clone();
+            if let Some(token) = tokens.next() {
+                if token.r#type != TokenType::OpenParen {
+                    while let Some(token) = tokens.next() {
+                        if token.r#type == TokenType::SemiColon {
+                            break;
+                        }
+                    }
+                    return Err(ParseError::new(
+                        ParseErrorType::Error,
+                        token.clone(),
+                        "Unexpected token",
+                        Some("Expected \"(\""),
+                    ));
+                }
+            } else {
+                return Err(ParseError::new(
+                    ParseErrorType::Error,
+                    token.clone(),
+                    "Unexpected end of input",
+                    None::<String>,
+                ));
+            }
+
+            while let Some(token) = tokens.next() {
+                match token.r#type {
+                    TokenType::Literal => {
+                        variables.push(token.value.clone());
+                    }
+                    TokenType::Identifier => {
+                        if current.r#type == InstructionType::None {
+                            match parse_identifier(tokens, max_size) {
+                                Ok(instruction) => current = instruction,
+                                Err(message) => {
+                                    message.print();
+                                    failed = true;
+                                }
+                            }
+                        } else {
+                            ParseError::new(
+                                ParseErrorType::Error,
+                                token.clone(),
+                                "Unexpected token",
+                                Some("Did you forget a semicolon?"),
+                            )
+                            .print();
+                            failed = true;
+                            let token = token.clone();
+                            tokens.insert(Token::new(
+                                TokenType::SemiColon,
+                                &";".to_string(),
+                                token.line,
+                                token.column,
+                            ));
+                        }
+                    }
+                    TokenType::Keyword => match parse_keyword(tokens, max_size) {
+                        Ok(instruction) => {
+                            if current.r#type == InstructionType::None {
+                                current = instruction;
+                            } else {
+                                ParseError::new(
+                                    ParseErrorType::Error,
+                                    token.clone(),
+                                    "Unexpected token",
+                                    Some("Did you forget a semicolon?"),
+                                )
+                                .print();
+                                failed = true;
+                            }
+                        }
+                        Err(message) => {
+                            message.print();
+                            failed = true;
+                        }
+                    },
+                    TokenType::OpenBlock => ParseError::new(
+                        ParseErrorType::Error,
+                        token.clone(),
+                        "Blocks not supported",
+                        None::<String>,
+                    ),
+                }
+            }
+        }
+    }
+}
+
 fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
     let mut current = Instruction::new(InstructionType::None, 0, 0);
     let mut block = Vec::new();
@@ -253,6 +350,33 @@ fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction
             TokenType::Identifier => {
                 if current.r#type == InstructionType::None {
                     match parse_identifier(tokens, max_size) {
+                        Ok(instruction) => current = instruction,
+                        Err(message) => {
+                            message.print();
+                            failed = true;
+                        }
+                    }
+                } else {
+                    ParseError::new(
+                        ParseErrorType::Error,
+                        token.clone(),
+                        "Unexpected token",
+                        Some("Did you forget a semicolon?"),
+                    )
+                    .print();
+                    failed = true;
+                    let token = token.clone();
+                    tokens.insert(Token::new(
+                        TokenType::SemiColon,
+                        &";".to_string(),
+                        token.line,
+                        token.column,
+                    ));
+                }
+            }
+            TokenType::Keyword => {
+                if current.r#type == InstructionType::None {
+                    match parse_keyword(tokens, max_size) {
                         Ok(instruction) => current = instruction,
                         Err(message) => {
                             message.print();

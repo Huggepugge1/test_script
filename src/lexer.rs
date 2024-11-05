@@ -2,6 +2,7 @@
 pub enum TokenType {
     Literal,
     Identifier,
+    Keyword,
     OpenBlock,
     CloseBlock,
     OpenParen,
@@ -81,6 +82,13 @@ impl TokenCollection {
     }
 }
 
+fn is_keyword(value: &String) -> bool {
+    match value.as_str() {
+        "for" => true,
+        _ => false,
+    }
+}
+
 pub fn tokenize(contents: String) -> TokenCollection {
     let mut tokens = TokenCollection::new(Vec::new());
     let mut current = String::new();
@@ -102,6 +110,18 @@ pub fn tokenize(contents: String) -> TokenCollection {
                     i += 1;
                     column += 1;
                 }
+
+                if is_keyword(&current) {
+                    tokens.push(Token::new(TokenType::Keyword, &current, line, start_column));
+                } else {
+                    tokens.push(Token::new(
+                        TokenType::Identifier,
+                        &current,
+                        line,
+                        start_column,
+                    ));
+                }
+
                 tokens.push(Token::new(
                     TokenType::Identifier,
                     &current,
