@@ -46,6 +46,10 @@ impl Token {
             column,
         }
     }
+
+    pub fn assignment(&self) -> bool {
+        self.r#type == TokenType::Keyword && self.value == "in"
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,7 +78,18 @@ impl TokenCollection {
         }
     }
 
+    pub fn peek(&self) -> Option<Token> {
+        if (self.index + 1) >= self.tokens.len() {
+            None
+        } else {
+            Some(self.tokens[self.index + 1].clone())
+        }
+    }
+
     pub fn next(&mut self) -> Option<Token> {
+        if (self.index + 1) >= self.tokens.len() {
+            return None;
+        }
         if !self.started {
             self.started = true;
         } else {

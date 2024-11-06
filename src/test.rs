@@ -6,7 +6,7 @@ pub fn run(args: cli::Args) {
     let tokens = lexer::tokenize(contents);
     let program = parser::Parser::new(tokens, args.max_size).parse();
     match program {
-        Ok(program) => interpreter::interpret(program),
-        Err(()) => (),
+        Ok(program) => interpreter::Interpreter::new(program).interpret(),
+        Err(_) => (),
     }
 }

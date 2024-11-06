@@ -5,9 +5,9 @@
 int main() {
     char *a = malloc(sizeof(char) * 100);
     while (1) {
-        scanf("%s", a);
-        printf("%s\n", a);
-        if (strcmp(a, "q") == 0) {
+        fgets(a, 100, stdin);
+        printf("%s", a);
+        if (strcmp(a, "q\n") == 0) {
             break;
         }
     }

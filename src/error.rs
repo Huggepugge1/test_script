@@ -1,10 +1,13 @@
 use crate::token::{Token, TokenType};
 
+#[derive(Debug)]
 pub enum ParseErrorType {
     UnexpectedToken,
     UnexpectedEndOfFile,
     MismatchedType(TokenType, TokenType),
     RegexError,
+    VariableAlreadyDefined,
+    VariableNotDefined,
 
     TestError,
 
@@ -24,6 +27,8 @@ impl std::fmt::Display for ParseErrorType {
                 )
             }
             ParseErrorType::RegexError => write!(f, "Regex error"),
+            ParseErrorType::VariableAlreadyDefined => write!(f, "Variable already defined"),
+            ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
 
             ParseErrorType::TestError => write!(f, "Test error"),
 
@@ -32,6 +37,7 @@ impl std::fmt::Display for ParseErrorType {
     }
 }
 
+#[derive(Debug)]
 pub struct ParseError {
     pub r#type: ParseErrorType,
     token: Token,
@@ -90,6 +96,40 @@ impl ParseWarning {
             "Warning: {} {:?}, {}:{}\n\
              Hint: {}\n",
             self.r#type, self.token.value, self.token.line, self.token.column, self.hint
+        );
+    }
+}
+
+pub enum InterpreterErrorType {
+    IncompatibleTypes,
+}
+
+impl std::fmt::Display for InterpreterErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            InterpreterErrorType::IncompatibleTypes => write!(f, "Incompatible types"),
+        }
+    }
+}
+
+pub struct InterpreterError {
+    pub r#type: InterpreterErrorType,
+    hint: String,
+}
+
+impl InterpreterError {
+    pub fn new(r#type: InterpreterErrorType, hint: impl Into<String>) -> InterpreterError {
+        InterpreterError {
+            r#type,
+            hint: hint.into(),
+        }
+    }
+
+    pub fn print(&self) {
+        eprintln!(
+            "Error while executing: {}\n\
+                   Hint: {}\n",
+            self.r#type, self.hint
         );
     }
 }

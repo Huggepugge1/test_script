@@ -1,15 +1,8 @@
 test1("input_test") {
-    input("a");
-    output("a");
-    input("q");
-    output("q");
-}
-
-test2("input_test") {
-    input("hello");
-    output("hello");
-    input("hello2");
-    output("hello2");
-    input("q");
-    output("q");
+	for i in /[a-z]\d{3}/ {
+		input(i);
+		output(i);
+	}
+	input("q");
+	output("q");
 }

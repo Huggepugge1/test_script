@@ -4,6 +4,8 @@ use std::path::PathBuf;
 pub enum BuiltIn {
     Input(Box<Instruction>),
     Output(Box<Instruction>),
+    Print(Box<Instruction>),
+    Println(Box<Instruction>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +36,8 @@ pub enum InstructionType {
     RegexLiteral(Vec<String>),
     BuiltIn(BuiltIn),
     Test(Vec<Instruction>, String, PathBuf),
-    For(Vec<Instruction>, Instruction),
+    For(Vec<Instruction>, Box<Instruction>),
+    Assignment(String, Box<Instruction>),
+    Variable(String),
     None,
 }

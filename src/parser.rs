@@ -1,19 +1,26 @@
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
 use crate::regex;
-use crate::token::{TokenCollection, TokenType};
+use crate::token::{Token, TokenCollection, TokenType};
+
+use std::collections::HashSet;
 
 pub struct Parser {
     tokens: TokenCollection,
+    variables: HashSet<String>,
     max_size: u32,
 }
 
 impl Parser {
     pub fn new(tokens: TokenCollection, max_size: u32) -> Self {
-        return Self { tokens, max_size };
+        return Self {
+            tokens,
+            variables: HashSet::new(),
+            max_size,
+        };
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Instruction>, ()> {
+    pub fn parse(&mut self) -> Result<Vec<Instruction>, ParseError> {
         let mut program = Vec::new();
         let mut failed = false;
 
@@ -43,7 +50,11 @@ impl Parser {
         }
 
         if failed {
-            Err(())
+            Err(ParseError::new(
+                ParseErrorType::TestError,
+                self.tokens.current().unwrap(),
+                "",
+            ))
         } else {
             Ok(program)
         }
@@ -72,7 +83,12 @@ impl Parser {
             }
             _ => self.parse_expression(),
         }?;
-        self.end_statement()?;
+        match instruction.r#type {
+            InstructionType::For(_, _) => {
+                self.tokens.next();
+            }
+            _ => self.end_statement()?,
+        }
         Ok(instruction)
     }
 
@@ -80,6 +96,7 @@ impl Parser {
         let token = self.tokens.current().unwrap();
         let instruction = match token.r#type {
             TokenType::StringLiteral => self.parse_string_literal(),
+            TokenType::RegexLiteral => self.parse_regex_literal(),
             TokenType::Keyword => self.parse_keyword(),
             TokenType::BuiltIn => self.parse_builtin(),
             TokenType::Identifier => self.parse_identifier(),
@@ -168,34 +185,65 @@ impl Parser {
         let token = self.tokens.current().unwrap();
         match token.value.as_str() {
             "for" => self.parse_for(),
+            "in" => Err(ParseError::new(
+                ParseErrorType::UnexpectedToken,
+                token.clone(),
+                "'in' is not allowed outside of a for loop",
+            )),
             _ => unreachable!(),
         }
     }
 
     fn parse_identifier(&mut self) -> Result<Instruction, ParseError> {
         let token = self.tokens.current().unwrap();
-        self.tokens.advance_to_next_instruction();
-        Err(ParseError::new(
-            ParseErrorType::NotImplemented,
-            token,
-            "See discord for more information about comming features",
-        ))
+        let assignment = self.peek_next_token()?;
+        if assignment.assignment() == false {
+            if !self.variables.contains(&token.value) {
+                self.tokens.advance_to_next_instruction();
+                Err(ParseError::new(
+                    ParseErrorType::VariableNotDefined,
+                    token.clone(),
+                    format!("Variable \"{}\" is not defined", token.value),
+                ))
+            } else {
+                Ok(Instruction::new(
+                    InstructionType::Variable(token.value),
+                    token.line,
+                    token.column,
+                ))
+            }
+        } else {
+            self.tokens.next();
+            let identifier = token.value.clone();
+            if self.variables.contains(&identifier) {
+                self.tokens.advance_to_next_instruction();
+                Err(ParseError::new(
+                    ParseErrorType::VariableAlreadyDefined,
+                    token.clone(),
+                    format!("Variable {} is already defined", identifier),
+                ))
+            } else {
+                self.variables.insert(identifier.clone());
+                self.tokens.next();
+                let instruction = self.parse_expression()?;
+                Ok(Instruction::new(
+                    InstructionType::Assignment(identifier, Box::new(instruction)),
+                    token.line,
+                    token.column,
+                ))
+            }
+        }
     }
 
     fn parse_builtin(&mut self) -> Result<Instruction, ParseError> {
         let token = self.tokens.current().unwrap();
         self.expect_token(TokenType::OpenParen)?;
-        let instruction = match self.tokens.next() {
-            Some(token) => match token.r#type {
-                TokenType::CloseParen => Ok(Instruction::NONE),
-                _ => self.parse_expression(),
-            },
-            None => Err(ParseError::new(
-                ParseErrorType::UnexpectedEndOfFile,
-                token.clone(),
-                "The file ended in the middle of an instruction",
-            )),
+        let close_paren = self.get_next_token()?;
+        let instruction = match close_paren.r#type {
+            TokenType::CloseParen => Ok(Instruction::NONE),
+            _ => self.parse_expression(),
         }?;
+
         self.expect_token(TokenType::CloseParen)?;
         match token.value.as_str() {
             "input" => Ok(Instruction::new(
@@ -205,6 +253,16 @@ impl Parser {
             )),
             "output" => Ok(Instruction::new(
                 InstructionType::BuiltIn(BuiltIn::Output(Box::new(instruction))),
+                token.line,
+                token.column,
+            )),
+            "print" => Ok(Instruction::new(
+                InstructionType::BuiltIn(BuiltIn::Print(Box::new(instruction))),
+                token.line,
+                token.column,
+            )),
+            "println" => Ok(Instruction::new(
+                InstructionType::BuiltIn(BuiltIn::Println(Box::new(instruction))),
                 token.line,
                 token.column,
             )),
@@ -232,16 +290,17 @@ impl Parser {
 
     fn parse_for(&mut self) -> Result<Instruction, ParseError> {
         let token = self.tokens.current().unwrap();
-        self.expect_token(TokenType::RegexLiteral)?;
-        let regex_vec = self.parse_regex_literal()?;
+        self.expect_token(TokenType::Identifier)?;
+        let assignment = self.parse_identifier()?;
         self.expect_token(TokenType::OpenBlock)?;
         self.tokens.next();
+
         let (block, failed) = self.parse_block();
 
         match failed {
             true => Err(ParseError::new(ParseErrorType::TestError, token, "")),
             false => Ok(Instruction::new(
-                InstructionType::For(block, regex_vec),
+                InstructionType::For(block, Box::new(assignment)),
                 token.line,
                 token.column,
             )),
@@ -249,43 +308,53 @@ impl Parser {
     }
 
     fn expect_token(&mut self, expected: TokenType) -> Result<(), ParseError> {
-        if let Some(token) = self.tokens.next() {
-            if token.r#type != expected {
-                self.tokens.advance_to_next_instruction();
-                Err(ParseError::new(
-                    ParseErrorType::MismatchedType(expected, token.clone().r#type),
-                    token.clone(),
-                    format!("Token {:?} is not of the right type", token.value),
-                ))
-            } else {
-                Ok(())
-            }
-        } else {
+        let token = self.get_next_token()?;
+        if token.r#type != expected {
+            self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
-                ParseErrorType::UnexpectedEndOfFile,
-                self.tokens.current().unwrap(),
-                "The file ended in the middle of an instruction",
+                ParseErrorType::MismatchedType(expected, token.clone().r#type),
+                token.clone(),
+                format!("Token {:?} is not of the right type", token.value),
             ))
+        } else {
+            Ok(())
         }
     }
 
     fn end_statement(&mut self) -> Result<(), ParseError> {
+        let token = self.get_next_token()?;
+        if token.r#type == TokenType::Semicolon || token.r#type == TokenType::CloseBlock {
+            self.tokens.next();
+            Ok(())
+        } else {
+            Err(ParseError::new(
+                ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
+                token.clone(),
+                "Did you forget a semicolon?",
+            ))
+        }
+    }
+
+    fn get_next_token(&mut self) -> Result<Token, ParseError> {
         if let Some(token) = self.tokens.next() {
-            if token.r#type == TokenType::Semicolon {
-                self.tokens.next();
-                Ok(())
-            } else {
-                Err(ParseError::new(
-                    ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
-                    token.clone(),
-                    "Did you forget a semicolon?",
-                ))
-            }
+            Ok(token)
         } else {
             Err(ParseError::new(
                 ParseErrorType::UnexpectedEndOfFile,
                 self.tokens.current().unwrap(),
-                "The file ended in the middle of an instruction",
+                "",
+            ))
+        }
+    }
+
+    fn peek_next_token(&mut self) -> Result<Token, ParseError> {
+        if let Some(token) = self.tokens.peek() {
+            Ok(token)
+        } else {
+            Err(ParseError::new(
+                ParseErrorType::UnexpectedEndOfFile,
+                self.tokens.current().unwrap(),
+                "",
             ))
         }
     }
