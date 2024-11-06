@@ -1,6 +1,5 @@
 use crate::parser::{BuiltIn, Instruction, InstructionType};
 
-use itertools::Itertools;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -9,8 +8,8 @@ struct Test {
     name: String,
     file: PathBuf,
     expressions: Vec<Instruction>,
-    input: Vec<Vec<String>>,
-    output: Vec<Vec<String>>,
+    input: Vec<String>,
+    output: Vec<String>,
 }
 
 impl Test {
@@ -24,22 +23,30 @@ impl Test {
         }
     }
 
-    fn run_test(&mut self, input: Vec<&String>, output: Vec<String>) -> Result<(), ()> {
+    fn run_test(&mut self) -> Result<(), ()> {
         let mut process = Process::spawn(self.file.clone()).expect("Failed to run test");
         let mut buffer = String::new();
-        for line in input {
-            buffer.push_str(line);
+        for line in self.input.clone() {
+            buffer.push_str(&line);
             buffer.push('\n');
         }
         process.send(&buffer).expect("Failed to send input");
 
         let lines = process.get_lines().expect("Failed to get output");
+        if lines.len() != self.output.len() {
+            self.fail(&format!(
+                "Expected output length: {}, got: {}",
+                self.output.len(),
+                lines.len()
+            ));
+            return Err(());
+        }
 
         for (i, line) in lines.iter().enumerate() {
-            if *line != output[i] {
+            if self.output[i] != *line {
                 self.fail(&format!(
                     "Expected output: {:?}, got: {:?}",
-                    output[i], line
+                    line, self.output[i]
                 ));
                 return Err(());
             }
@@ -54,29 +61,10 @@ impl Test {
             self.interpret_expression(expression);
         }
 
-        let combined_input = self.input.clone();
-        let combined_input = combined_input
-            .iter()
-            .multi_cartesian_product()
-            .collect::<Vec<_>>();
-
-        let combined_output = self
-            .input
-            .iter()
-            .zip(self.output.iter())
-            .map(|(a, b)| {
-                let extended: Vec<_> = b.iter().cycle().take(a.len()).cloned().collect::<Vec<_>>();
-                extended
-            })
-            .multi_cartesian_product()
-            .collect::<Vec<_>>();
-
-        for (input, output) in combined_input.iter().zip(combined_output.iter()) {
-            if self.run_test(input.clone(), output.clone()).is_err() {
-                return;
-            }
+        match self.run_test() {
+            Ok(_) => self.pass(),
+            Err(_) => (),
         }
-        self.pass();
     }
 
     fn pass(&self) {
@@ -87,46 +75,23 @@ impl Test {
         eprintln!("{} failed: {}", self.name, message);
     }
 
-    fn input(&mut self, value: Vec<String>) -> Vec<String> {
-        self.input.push(value.clone());
-        value
-    }
-
-    fn output(&mut self, value: Vec<String>) -> Vec<String> {
-        let mut result: Vec<Vec<String>> =
-            vec![Vec::new(); value[0].chars().filter(|e| e == &'\n').count() + 1];
-        for output in value.iter() {
-            for (i, line) in output.split('\n').enumerate() {
-                result[i].push(line.to_string());
-            }
-        }
-
-        for i in result {
-            self.output.push(i);
-        }
-        value
-    }
-
-    fn interpret_literal(&self, value: Vec<String>) -> Vec<String> {
-        value
-    }
-
-    fn interpret_builtin(&mut self, builtin: BuiltIn) -> Vec<String> {
+    fn interpret_builtin(&mut self, builtin: BuiltIn) -> String {
         let value = match builtin.clone() {
             BuiltIn::Input(value) => self.interpret_expression(*value),
             BuiltIn::Output(value) => self.interpret_expression(*value),
         };
         match builtin {
-            BuiltIn::Input(_) => self.input(value),
-            BuiltIn::Output(_) => self.output(value),
+            BuiltIn::Input(_) => self.input.push(value.clone()),
+            BuiltIn::Output(_) => self.output.push(value.clone()),
         }
+        return value;
     }
 
-    fn interpret_expression(&mut self, instruction: Instruction) -> Vec<String> {
+    fn interpret_expression(&mut self, instruction: Instruction) -> String {
         match instruction.r#type {
-            InstructionType::Literal(value) => self.interpret_literal(value),
+            InstructionType::Literal(value) => value,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin),
-            InstructionType::None => Vec::new(),
+            InstructionType::None => String::new(),
             _ => panic!("Unexpected instruction {:?}", instruction),
         }
     }

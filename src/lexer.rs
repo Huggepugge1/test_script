@@ -34,18 +34,18 @@ pub fn tokenize_string_literal(
 ) -> Token {
     let start_line = line.clone();
     let start_column = column.clone();
+    contents.next();
 
     let mut current = String::new();
-    while let Some(next) = contents.peek() {
-        if *next == '\n' {
+    while let Some(next) = contents.next() {
+        if next == '\n' {
             *line += 1;
             *column = 1;
         }
-        if *next == '"' {
+        if next == '"' {
             break;
         }
-        current.push(*next);
-        contents.next();
+        current.push(next);
         *column += 1;
     }
 
@@ -54,35 +54,63 @@ pub fn tokenize_string_literal(
 
 pub fn tokenize(contents: String) -> TokenCollection {
     let mut tokens = TokenCollection::new(Vec::new());
-    let mut current = String::new();
     let mut line = 1;
     let mut column = 1;
 
     let mut contents = contents.chars().peekable();
     while let Some(c) = contents.peek() {
-        current.push(*c);
         match c {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
-                tokens.push(tokenize_identifier(&mut contents, line, &mut column))
+                tokens.push(tokenize_identifier(&mut contents, line, &mut column));
+                continue;
             }
-            '{' => tokens.push(Token::new(TokenType::OpenBlock, &current, line, column)),
-            '}' => tokens.push(Token::new(TokenType::CloseBlock, &current, line, column)),
-            '(' => tokens.push(Token::new(TokenType::OpenParen, &current, line, column)),
-            ')' => tokens.push(Token::new(TokenType::CloseParen, &current, line, column)),
-            '"' => tokens.push(tokenize_string_literal(
-                &mut contents,
-                &mut line,
-                &mut column,
+            '{' => tokens.push(Token::new(
+                TokenType::OpenBlock,
+                &"{".to_string(),
+                line,
+                column,
             )),
-            ';' => tokens.push(Token::new(TokenType::SemiColon, &current, line, column)),
+            '}' => tokens.push(Token::new(
+                TokenType::CloseBlock,
+                &"}".to_string(),
+                line,
+                column,
+            )),
+            '(' => tokens.push(Token::new(
+                TokenType::OpenParen,
+                &"(".to_string(),
+                line,
+                column,
+            )),
+            ')' => tokens.push(Token::new(
+                TokenType::CloseParen,
+                &")".to_string(),
+                line,
+                column,
+            )),
+            '"' => {
+                tokens.push(tokenize_string_literal(
+                    &mut contents,
+                    &mut line,
+                    &mut column,
+                ));
+                continue;
+            }
+            ';' => tokens.push(Token::new(
+                TokenType::Semicolon,
+                &";".to_string(),
+                line,
+                column,
+            )),
             '\n' => {
                 line += 1;
                 column = 1;
+                contents.next();
+                continue;
             }
             ' ' | '\t' => (),
             _ => panic!("Unexpected character: \"{}\"", c),
         }
-        current = String::new();
         column += 1;
         contents.next();
     }

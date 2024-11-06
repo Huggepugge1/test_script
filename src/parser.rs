@@ -1,5 +1,5 @@
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
-use crate::token::{TokenCollection, TokenType};
+use crate::token::{Token, TokenCollection, TokenType};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,8 +39,9 @@ pub enum InstructionType {
     None,
 }
 
-fn parse_literal(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
+fn parse_literal(tokens: &mut TokenCollection, _max_size: u32) -> Result<Instruction, ParseError> {
     let token = tokens.current().unwrap();
+
     if token.r#type != TokenType::Literal {
         tokens.advance_to_next_instruction();
         Err(ParseError::new(
@@ -81,33 +82,64 @@ fn expect_token(tokens: &mut TokenCollection, expected: TokenType) -> Result<(),
 fn parse_builtin(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
     let token = tokens.current().unwrap();
     expect_token(tokens, TokenType::OpenParen)?;
-    Ok(Instruction::NONE)
+    let instruction = match tokens.next() {
+        Some(token) => match token.r#type {
+            TokenType::CloseParen => Ok(Instruction::NONE),
+            _ => parse_expression(tokens, max_size),
+        },
+        None => Err(ParseError::new(
+            ParseErrorType::UnexpectedEndOfFile,
+            token.clone(),
+            "The file ended in the middle of an instruction",
+        )),
+    }?;
+    expect_token(tokens, TokenType::CloseParen)?;
+    match token.value.as_str() {
+        "input" => Ok(Instruction::new(
+            InstructionType::BuiltIn(BuiltIn::Input(Box::new(instruction))),
+            token.line,
+            token.column,
+        )),
+        "output" => Ok(Instruction::new(
+            InstructionType::BuiltIn(BuiltIn::Output(Box::new(instruction))),
+            token.line,
+            token.column,
+        )),
+        _ => unreachable!(),
+    }
 }
 
 fn parse_identifier(
     tokens: &mut TokenCollection,
-    max_size: u32,
+    _max_size: u32,
 ) -> Result<Instruction, ParseError> {
-    let token = tokens.current();
-    Ok(Instruction::NONE)
+    let token = tokens.current().unwrap();
+    tokens.advance_to_next_instruction();
+    Err(ParseError::new(
+        ParseErrorType::NotImplemented,
+        token,
+        "See discord for more information about comming features",
+    ))
 }
 
 fn parse_keyword(tokens: &mut TokenCollection, _max_size: u32) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap();
+    tokens.advance_to_next_instruction();
     Err(ParseError::new(
         ParseErrorType::NotImplemented,
-        tokens.current().unwrap().clone(),
+        token,
         "See discord for more information about comming features",
     ))
 }
 
 fn end_statement(tokens: &mut TokenCollection) -> Result<(), ParseError> {
-    if let Some(token) = tokens.current() {
-        if token.r#type == TokenType::SemiColon {
+    if let Some(token) = tokens.next() {
+        if token.r#type == TokenType::Semicolon {
             tokens.next();
             Ok(())
         } else {
             Err(ParseError::new(
-                ParseErrorType::MissingSemicolon,
+                ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
                 token.clone(),
                 "Did you forget a semicolon?",
             ))
@@ -121,9 +153,66 @@ fn end_statement(tokens: &mut TokenCollection) -> Result<(), ParseError> {
     }
 }
 
+fn parse_expression(
+    tokens: &mut TokenCollection,
+    max_size: u32,
+) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap();
+    let instruction = match token.r#type {
+        TokenType::Literal => parse_literal(tokens, max_size),
+        TokenType::Keyword => parse_keyword(tokens, max_size),
+        TokenType::BuiltIn => parse_builtin(tokens, max_size),
+        TokenType::Identifier => parse_identifier(tokens, max_size),
+        TokenType::Semicolon => Err(ParseError::new(
+            ParseErrorType::UnexpectedToken,
+            token,
+            "Semicolon found in the middle of an expression",
+        )),
+        _ => {
+            tokens.advance_to_next_instruction();
+            Err(ParseError::new(
+                ParseErrorType::NotImplemented,
+                token,
+                "See discord for more information about comming features",
+            ))
+        }
+    };
+
+    instruction
+}
+
+fn parse_statement(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
+    let token = tokens.current().unwrap();
+    let instruction = match token.r#type {
+        TokenType::Semicolon => {
+            ParseWarning::new(
+                ParseWarningType::ExtraSemicolon,
+                token,
+                "Remove the trailing semicolon",
+            )
+            .print();
+            tokens.next();
+            return Ok(Instruction::NONE);
+        }
+        TokenType::Literal => {
+            ParseWarning::new(
+                ParseWarningType::UnusedLiteral,
+                token,
+                "This literal is not being used in the program",
+            );
+            parse_literal(tokens, max_size)
+        }
+        _ => parse_expression(tokens, max_size),
+    }?;
+    end_statement(tokens)?;
+    Ok(instruction)
+}
+
 fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction, ParseError> {
+    let mut failed = false;
     let token = tokens.current().unwrap();
     expect_token(tokens, TokenType::OpenParen)?;
+    tokens.next();
     let path = parse_literal(tokens, max_size)?;
     let path = match path.r#type {
         InstructionType::Literal(path) => path,
@@ -131,54 +220,37 @@ fn parse_test(tokens: &mut TokenCollection, max_size: u32) -> Result<Instruction
     };
     expect_token(tokens, TokenType::CloseParen)?;
     expect_token(tokens, TokenType::OpenBlock)?;
+    tokens.next();
 
     let mut block = Vec::new();
     while let Some(token) = tokens.current() {
-        let instruction = match token.r#type {
-            TokenType::Literal => {
-                ParseWarning::new(
-                    ParseWarningType::UnusedLiteral,
-                    token,
-                    "See discord for more information about comming features",
-                )
-                .print();
-                parse_literal(tokens, max_size)
-            }
-            TokenType::Keyword => parse_keyword(tokens, max_size),
-            TokenType::BuiltIn => parse_builtin(tokens, max_size),
-            TokenType::Identifier => parse_identifier(tokens, max_size),
-            TokenType::CloseBlock => {
-                break;
-            }
-            _ => {
-                tokens.advance_to_next_instruction();
-                Err(ParseError::new(
-                    ParseErrorType::NotImplemented,
-                    token,
-                    "See discord for more information about comming features",
-                ))
-            }
-        };
-
-        match instruction {
-            Ok(instruction) => block.push(instruction),
-            Err(error) => error.print(),
+        if token.r#type == TokenType::CloseBlock {
+            break;
         }
-        end_statement(tokens)?;
+        match parse_statement(tokens, max_size) {
+            Ok(instruction) => block.push(instruction),
+            Err(e) => {
+                e.print();
+                failed = true;
+            }
+        }
     }
 
-    Ok(Instruction::new(
-        InstructionType::Test(block, token.value, path.into()),
-        token.line,
-        token.column,
-    ))
+    match failed {
+        true => Err(ParseError::new(ParseErrorType::TestError, token, "")),
+        false => Ok(Instruction::new(
+            InstructionType::Test(block, token.value, ("./".to_string() + &path).into()),
+            token.line,
+            token.column,
+        )),
+    }
 }
 
 pub fn parse(tokens: &mut TokenCollection, max_size: u32) -> Result<Vec<Instruction>, ()> {
     let mut program = Vec::new();
     let mut failed = false;
 
-    while let Some(token) = tokens.current() {
+    while let Some(token) = tokens.next() {
         let instruction = match token.clone().r#type {
             TokenType::Identifier => parse_test(tokens, max_size),
             r#type => {
@@ -194,7 +266,10 @@ pub fn parse(tokens: &mut TokenCollection, max_size: u32) -> Result<Vec<Instruct
         match instruction {
             Ok(instruction) => program.push(instruction),
             Err(error) => {
-                error.print();
+                match error.r#type {
+                    ParseErrorType::TestError => (),
+                    _ => error.print(),
+                }
                 failed = true;
             }
         }

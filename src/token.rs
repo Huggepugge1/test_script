@@ -8,7 +8,7 @@ pub enum TokenType {
     CloseBlock,
     OpenParen,
     CloseParen,
-    SemiColon,
+    Semicolon,
 }
 
 impl std::fmt::Display for TokenType {
@@ -18,11 +18,11 @@ impl std::fmt::Display for TokenType {
             TokenType::Keyword => write!(f, "Keyword"),
             TokenType::BuiltIn => write!(f, "BuiltIn"),
             TokenType::Identifier => write!(f, "Identifier"),
-            TokenType::OpenBlock => write!(f, "\"{{\""),
-            TokenType::CloseBlock => write!(f, "\"}}\""),
-            TokenType::OpenParen => write!(f, "\"(\""),
-            TokenType::CloseParen => write!(f, "\")\""),
-            TokenType::SemiColon => write!(f, "\";\""),
+            TokenType::OpenBlock => write!(f, "OpenBlock"),
+            TokenType::CloseBlock => write!(f, "CloseBlock"),
+            TokenType::OpenParen => write!(f, "OpenParen"),
+            TokenType::CloseParen => write!(f, "CloseParen"),
+            TokenType::Semicolon => write!(f, "Semicolon"),
         }
     }
 }
@@ -63,7 +63,7 @@ impl TokenCollection {
     }
 
     pub fn current(&self) -> Option<Token> {
-        if self.index > self.tokens.len() {
+        if self.index >= self.tokens.len() {
             None
         } else if self.started {
             Some(self.tokens[self.index].clone())
@@ -78,23 +78,8 @@ impl TokenCollection {
         } else {
             self.index += 1;
         }
-        self.current()
-    }
-
-    pub fn peek(&mut self) -> Option<Token> {
-        if self.index + 1 < self.tokens.len() {
-            Some(self.tokens[self.index + 1].clone())
-        } else if !self.started {
-            self.started = true;
-            Some(self.tokens[self.index].clone())
-        } else {
-            Some(self.tokens[self.index + 1].clone())
-        }
-    }
-
-    pub fn insert(&mut self, token: Token) {
-        self.tokens.insert(self.index, token);
-        self.index -= 1;
+        let result = self.current();
+        result
     }
 
     pub fn push(&mut self, token: Token) {
@@ -103,9 +88,10 @@ impl TokenCollection {
 
     pub fn advance_to_next_instruction(&mut self) {
         while let Some(token) = self.next() {
-            if token.r#type == TokenType::SemiColon {
+            if token.r#type == TokenType::Semicolon {
                 break;
             }
         }
+        self.next();
     }
 }
