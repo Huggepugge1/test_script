@@ -1,6 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
-    Literal,
+    StringLiteral,
+    RegexLiteral,
     Keyword,
     BuiltIn,
     Identifier,
@@ -14,7 +15,8 @@ pub enum TokenType {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TokenType::Literal => write!(f, "Literal"),
+            TokenType::StringLiteral => write!(f, "String literal"),
+            TokenType::RegexLiteral => write!(f, "Regex literal"),
             TokenType::Keyword => write!(f, "Keyword"),
             TokenType::BuiltIn => write!(f, "BuiltIn"),
             TokenType::Identifier => write!(f, "Identifier"),

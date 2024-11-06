@@ -1,5 +1,6 @@
 mod cli;
 mod error;
+mod instruction;
 mod interpreter;
 mod lexer;
 mod parser;

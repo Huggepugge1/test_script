@@ -49,7 +49,7 @@ pub fn tokenize_string_literal(
         *column += 1;
     }
 
-    Token::new(TokenType::Literal, &current, start_line, start_column)
+    Token::new(TokenType::StringLiteral, &current, start_line, start_column)
 }
 
 pub fn tokenize(contents: String) -> TokenCollection {

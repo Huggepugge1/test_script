@@ -1,4 +1,4 @@
-use crate::parser::{BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BuiltIn, Instruction, InstructionType};
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::path::PathBuf;
@@ -89,7 +89,7 @@ impl Test {
 
     fn interpret_expression(&mut self, instruction: Instruction) -> String {
         match instruction.r#type {
-            InstructionType::Literal(value) => value,
+            InstructionType::StringLiteral(value) => value,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin),
             InstructionType::None => String::new(),
             _ => panic!("Unexpected instruction {:?}", instruction),

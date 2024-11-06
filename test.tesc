@@ -1,6 +1,6 @@
 test1("input_test") {
     input("a");
-    output("a");;
+    output("a");
     input("q");
     output("q");
 }
