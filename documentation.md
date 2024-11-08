@@ -12,7 +12,7 @@ The command is the command to run the program you are trying to test. For exampl
 The language is designed to test IO. There is two builtins that handle IO, `input` and `output`.
 
 #### Input
-Syntax: `input(string)`
+Syntax: `input(string)`<br>
 Sends the line string to the program being tested. Adds a new line at the end of the string. 
 
 #### Output
