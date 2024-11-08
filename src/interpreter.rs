@@ -3,7 +3,6 @@ use crate::instruction::{BuiltIn, Instruction, InstructionType};
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
-use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 #[derive(Debug, Clone)]
@@ -15,7 +14,7 @@ enum InstructionResult {
 
 struct Test {
     name: String,
-    file: PathBuf,
+    command: String,
     expressions: Vec<Instruction>,
     variables: HashMap<String, InstructionResult>,
     input: Vec<String>,
@@ -23,10 +22,10 @@ struct Test {
 }
 
 impl Test {
-    fn new(name: String, file: PathBuf, expressions: Vec<Instruction>) -> Self {
+    fn new(name: String, file: String, expressions: Vec<Instruction>) -> Self {
         Self {
             name,
-            file,
+            command: file,
             expressions,
             variables: HashMap::new(),
             input: Vec::new(),
@@ -35,7 +34,7 @@ impl Test {
     }
 
     fn run_test(&mut self) -> Result<(), ()> {
-        let mut process = Process::spawn(self.file.clone()).expect("Failed to run test");
+        let mut process = Process::spawn(self.command.clone()).expect("Failed to run test");
         let mut buffer = String::new();
         for line in self.input.clone() {
             buffer.push_str(&line);
@@ -58,7 +57,7 @@ impl Test {
             if self.output[i] != *line {
                 self.fail(&format!(
                     "Expected output: {:?}, got: {:?}",
-                    line, self.output[i]
+                    self.output[i], line
                 ));
                 return Err(());
             }
@@ -192,8 +191,10 @@ struct Process {
 }
 
 impl Process {
-    fn spawn(command: PathBuf) -> Result<Self, Error> {
-        let child = Command::new(command)
+    fn spawn(command: String) -> Result<Self, Error> {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg(command)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;

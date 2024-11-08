@@ -136,7 +136,7 @@ impl Parser {
         match failed {
             true => Err(ParseError::new(ParseErrorType::TestError, token, "")),
             false => Ok(Instruction::new(
-                InstructionType::Test(block, token.value, ("./".to_string() + &path).into()),
+                InstructionType::Test(block, token.value, path.into()),
                 token.line,
                 token.column,
             )),

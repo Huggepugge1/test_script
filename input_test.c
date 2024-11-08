@@ -11,4 +11,5 @@ int main() {
             break;
         }
     }
+    free(a);
 }

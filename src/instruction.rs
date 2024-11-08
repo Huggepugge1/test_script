@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltIn {
     Input(Box<Instruction>),
@@ -35,7 +33,7 @@ pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
     BuiltIn(BuiltIn),
-    Test(Vec<Instruction>, String, PathBuf),
+    Test(Vec<Instruction>, String, String),
     For(Vec<Instruction>, Box<Instruction>),
     Assignment(String, Box<Instruction>),
     Variable(String),
