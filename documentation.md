@@ -40,7 +40,7 @@ The only iterable available is the regular expression (regex).
 
 ### Regex
 Syntax: `/regular expression/`
-Creates an iterable containing all the different combinations that the Regex matches. Note: The star operation repeats 0-`max_len` inclusive times. `max_len` is set by the command line argument `--max-len`.
+Creates an iterable containing all the different combinations that the Regex matches. Note: The star operation repeats `0-max_len` inclusive times. `max_len` is set by the command line argument `--max-len`.
 
 #### Example
 /\d/ would create an iterable containg all digits 0-9.
