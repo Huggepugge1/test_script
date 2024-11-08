@@ -16,30 +16,30 @@ Syntax: `input(string)`<br>
 Sends the line string to the program being tested. Adds a new line at the end of the string. 
 
 #### Output
-Syntax: `output(string)`
+Syntax: `output(string)`<br>
 Expect the next line of the programs Output to be string. Adds a new line at the end of the string.
 
 ### Builtins
 #### Print
-Syntax: `print(string)`
+Syntax: `print(string)`<br>
 Print the string to the console. No extra newline.
 
 #### Println
-Syntax: `println(string)`
+Syntax: `println(string)`<br>
 Print the string to the console. Adds a newline at the end of the string.
 
 ## Loops
 The only loop available is the for loop.
 
 ### For
-Syntax: `for var_name in iterable { ... }`
+Syntax: `for var_name in iterable { ... }`<br>
 For each element in the iterable, name it var_name and run the block.
 
 ## Iterables
 The only iterable available is the regular expression (regex).
 
 ### Regex
-Syntax: `/regular expression/`
+Syntax: `/regular expression/`<br>
 Creates an iterable containing all the different combinations that the Regex matches. Note: The star operation repeats `0-max_len` inclusive times. `max_len` is set by the command line argument `--max-len`.
 
 #### Example
