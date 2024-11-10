@@ -50,6 +50,10 @@ impl Token {
     pub fn assignment(&self) -> bool {
         self.r#type == TokenType::Keyword && self.value == "in"
     }
+
+    pub fn operator(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +101,12 @@ impl TokenCollection {
         }
         let result = self.current();
         result
+    }
+
+    pub fn back(&mut self) {
+        if self.index > 0 {
+            self.index -= 1;
+        }
     }
 
     pub fn push(&mut self, token: Token) {

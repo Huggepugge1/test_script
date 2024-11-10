@@ -16,18 +16,20 @@ enum InstructionResult {
 struct Test {
     name: String,
     file: PathBuf,
-    expressions: Vec<Instruction>,
+
+    test: Instruction,
     variables: HashMap<String, InstructionResult>,
     input: Vec<String>,
     output: Vec<String>,
 }
 
 impl Test {
-    fn new(name: String, file: PathBuf, expressions: Vec<Instruction>) -> Self {
+    fn new(name: String, file: PathBuf, test: Instruction) -> Self {
         Self {
             name,
             file,
-            expressions,
+
+            test,
             variables: HashMap::new(),
             input: Vec::new(),
             output: Vec::new(),
@@ -70,7 +72,7 @@ impl Test {
 
     fn run(&mut self) {
         for expression in self.expressions.clone() {
-            match self.interpret_expression(expression) {
+            match self.interpret_instruction(expression) {
                 Ok(_) => (),
                 Err(e) => {
                     self.fail("Failed to interpret expression");
@@ -99,10 +101,10 @@ impl Test {
         builtin: BuiltIn,
     ) -> Result<InstructionResult, InterpreterError> {
         let value = match builtin.clone() {
-            BuiltIn::Input(value) => self.interpret_expression(*value)?,
-            BuiltIn::Output(value) => self.interpret_expression(*value)?,
-            BuiltIn::Print(value) => self.interpret_expression(*value)?,
-            BuiltIn::Println(value) => self.interpret_expression(*value)?,
+            BuiltIn::Input(value) => self.interpret_instruction(*value)?,
+            BuiltIn::Output(value) => self.interpret_instruction(*value)?,
+            BuiltIn::Print(value) => self.interpret_instruction(*value)?,
+            BuiltIn::Println(value) => self.interpret_instruction(*value)?,
         };
         let value = match value {
             InstructionResult::String(value) => value,
@@ -125,13 +127,13 @@ impl Test {
 
     fn interpret_for(
         &mut self,
-        expressions: Vec<Instruction>,
+        instruction: Instruction,
         assignment: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
         let mut result = InstructionResult::None;
         let (assignment_var, assignment_values) = match assignment.r#type {
-            InstructionType::Assignment(var, instruction) => {
-                (var, self.interpret_expression(*instruction)?)
+            InstructionType::IterableAssignment(var, instruction) => {
+                (var, self.interpret_instruction(*instruction)?)
             }
             _ => {
                 unreachable!();
@@ -142,9 +144,7 @@ impl Test {
                 for value in values {
                     self.variables
                         .insert(assignment_var.clone(), InstructionResult::String(value));
-                    for expression in expressions.clone() {
-                        result = self.interpret_expression(expression)?;
-                    }
+                    self.interpret_instruction(instruction.clone());
                 }
             }
             _ => {
@@ -167,7 +167,7 @@ impl Test {
         }
     }
 
-    fn interpret_expression(
+    fn interpret_instruction(
         &mut self,
         instruction: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
@@ -176,8 +176,8 @@ impl Test {
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
             InstructionType::Variable(var) => self.interpret_variable(var)?,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
-            InstructionType::For(expressions, assignment) => {
-                self.interpret_for(expressions, *assignment)?
+            InstructionType::For(instruction, assignment) => {
+                self.interpret_for(*instruction, *assignment)?
             }
             InstructionType::None => InstructionResult::None,
             _ => {
@@ -247,7 +247,7 @@ impl Interpreter {
     fn interpret_test(&self, test: Instruction) {
         match test.r#type {
             InstructionType::Test(expressions, name, file) => {
-                let mut test = Test::new(name, file, expressions);
+                let mut test = Test::new(name, file, instruction);
                 test.run();
             }
             _ => panic!("Unexpected instruction {:?}", test),

@@ -1,3 +1,4 @@
+use crate::token::Token;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,7 +22,10 @@ impl Instruction {
         line: 0,
         column: 0,
     };
-    pub fn new(r#type: InstructionType, line: u32, column: u32) -> Self {
+
+    pub fn new(r#type: InstructionType, token: Token) -> Self {
+        let line = token.line;
+        let column = token.column;
         Self {
             r#type,
             line,
@@ -35,9 +39,10 @@ pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
     BuiltIn(BuiltIn),
-    Test(Vec<Instruction>, String, PathBuf),
-    For(Vec<Instruction>, Box<Instruction>),
-    Assignment(String, Box<Instruction>),
+    Block(Vec<Instruction>),
+    Test(Box<Instruction>, String, PathBuf),
+    For(Box<Instruction>, Box<Instruction>),
+    IterableAssignment(String, Box<Instruction>),
     Variable(String),
     None,
 }
