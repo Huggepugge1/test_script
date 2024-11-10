@@ -1,6 +1,7 @@
 use crate::environment::Environment;
 use crate::error::{InterpreterError, InterpreterErrorType};
-use crate::instruction::{BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType};
+use crate::r#type::Type;
 use crate::variable::Variable;
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
@@ -10,15 +11,17 @@ use std::process::{Child, Command, Stdio};
 pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
+    Integer(i64),
     None,
 }
 
 impl std::fmt::Display for InstructionResult {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            InstructionResult::String(_) => write!(f, "string"),
-            InstructionResult::Regex(_) => write!(f, "regex"),
-            InstructionResult::None => write!(f, "none"),
+            InstructionResult::String(s) => write!(f, "{}", s),
+            InstructionResult::Regex(s) => write!(f, "{:?}", s),
+            InstructionResult::Integer(i) => write!(f, "{}", i),
+            InstructionResult::None => write!(f, "()"),
         }
     }
 }
@@ -103,6 +106,17 @@ impl Test {
         eprintln!("{} failed: {}", self.name, message);
     }
 
+    fn interpret_binary_operation(
+        &mut self,
+        operator: BinaryOperator,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        match operator {
+            BinaryOperator::Addition => self.interpret_addition(left, right),
+        }
+    }
+
     fn interpret_addition(
         &mut self,
         left: Instruction,
@@ -114,16 +128,11 @@ impl Test {
             (InstructionResult::String(left), InstructionResult::String(right)) => {
                 Ok(InstructionResult::String(format!("{}{}", left, right)))
             }
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Integer(left + right))
+            }
             _ => {
-                return Err(InterpreterError::new(
-                    InterpreterErrorType::IncompatibleTypesBinary(
-                        InstructionResult::String(String::new()),
-                        left,
-                        InstructionResult::String(String::new()),
-                        right,
-                    ),
-                    "Expected two strings",
-                ));
+                unreachable!()
             }
         }
     }
@@ -141,13 +150,7 @@ impl Test {
         let value = match value {
             InstructionResult::String(value) => value,
             _ => {
-                return Err(InterpreterError::new(
-                    InterpreterErrorType::IncompatibleTypes(
-                        InstructionResult::String(String::new()),
-                        value,
-                    ),
-                    "Expected a string",
-                ));
+                unreachable!()
             }
         };
         match builtin {
@@ -193,7 +196,7 @@ impl Test {
                 (var, self.interpret_instruction(*instruction)?)
             }
             _ => {
-                unreachable!();
+                unreachable!()
             }
         };
         match assignment_values {
@@ -207,13 +210,7 @@ impl Test {
                 }
             }
             _ => {
-                return Err(InterpreterError::new(
-                    InterpreterErrorType::IncompatibleTypes(
-                        InstructionResult::Regex(Vec::new()),
-                        assignment_values,
-                    ),
-                    "Expected an iterable",
-                ));
+                unreachable!()
             }
         }
         Ok(result)
@@ -226,6 +223,40 @@ impl Test {
         }
     }
 
+    fn interpret_type_cast(
+        &mut self,
+        instruction: Instruction,
+        r#type: Type,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let value = self.interpret_instruction(instruction)?;
+        match (value.clone(), r#type) {
+            (InstructionResult::String(value), Type::Int) => {
+                Ok(InstructionResult::Integer(match value.parse() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return Err(InterpreterError::new(
+                            InterpreterErrorType::TypeCastError {
+                                result: InstructionResult::String(value),
+                                from: Type::String,
+                                to: Type::Int,
+                            },
+                            "Failed to cast string to int",
+                        ));
+                    }
+                }))
+            }
+            (InstructionResult::Integer(value), Type::String) => {
+                Ok(InstructionResult::String(value.to_string()))
+            }
+            (InstructionResult::String(value), Type::Regex) => {
+                Ok(InstructionResult::Regex(vec![value]))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
     fn interpret_instruction(
         &mut self,
         instruction: Instruction,
@@ -233,20 +264,30 @@ impl Test {
         Ok(match instruction.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
-            InstructionType::Addition { left, right } => self.interpret_addition(*left, *right)?,
+            InstructionType::IntegerLiteral(value) => InstructionResult::Integer(value),
 
-            InstructionType::Variable(var) => self.interpret_variable(var)?,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
 
+            InstructionType::Block(instructions) => self.interpret_block(instructions)?,
             InstructionType::For(assignment, instruction) => {
                 self.interpret_for(*assignment, *instruction)?
             }
-            InstructionType::Block(instructions) => self.interpret_block(instructions)?,
             InstructionType::Assignment(var, instruction) => {
                 self.interpret_assignment(var, *instruction)?
             }
+            InstructionType::Variable(var) => self.interpret_variable(var)?,
 
             InstructionType::None => InstructionResult::None,
+            InstructionType::BinaryOperation {
+                operator,
+                left,
+                right,
+            } => self.interpret_binary_operation(operator, *left, *right)?,
+
+            InstructionType::TypeCast {
+                instruction,
+                r#type,
+            } => self.interpret_type_cast(*instruction, r#type)?,
             _ => {
                 unreachable!();
             }

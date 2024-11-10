@@ -2,6 +2,7 @@
 pub enum Type {
     String,
     Regex,
+    Int,
     None,
 
     Iterable,
@@ -12,6 +13,7 @@ impl Type {
         match value {
             "string" => Type::String,
             "regex" => Type::Regex,
+            "int" => Type::Int,
             _ => panic!("Invalid type"),
         }
     }
@@ -22,6 +24,7 @@ impl std::fmt::Display for Type {
         match self {
             Type::String => write!(f, "String"),
             Type::Regex => write!(f, "Regex"),
+            Type::Int => write!(f, "Int"),
             Type::None => write!(f, "()"),
 
             Type::Iterable => write!(f, "Iterable"),

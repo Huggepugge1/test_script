@@ -1,7 +1,7 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType};
-use crate::instruction::{BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType};
 use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
@@ -71,6 +71,7 @@ impl Parser {
         let mut instruction = match token.r#type {
             TokenType::StringLiteral => self.parse_string_literal()?,
             TokenType::RegexLiteral => self.parse_regex_literal()?,
+            TokenType::IntegerLiteral => self.parse_integer_literal()?,
             TokenType::Keyword => self.parse_keyword()?,
             TokenType::BuiltIn => self.parse_builtin()?,
             TokenType::Identifier => self.parse_identifier()?,
@@ -134,12 +135,14 @@ impl Parser {
         let token = self.get_next_token()?;
         match token.value.as_str() {
             "+" => Ok(Instruction::new(
-                InstructionType::Addition {
+                InstructionType::BinaryOperation {
+                    operator: BinaryOperator::Addition,
                     left: Box::new(last_instruction),
                     right: Box::new(self.parse_expression()?),
                 },
                 token,
             )),
+            "as" => self.parse_type_cast(last_instruction),
             "=" => Ok(Instruction::new(
                 InstructionType::Assignment(
                     Variable::new(
@@ -152,6 +155,35 @@ impl Parser {
             )),
             _ => unreachable!(),
         }
+    }
+
+    fn parse_type_cast(
+        &mut self,
+        last_instruction: Instruction,
+    ) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let r#type = match token {
+            Token {
+                r#type: TokenType::Type,
+                ref value,
+                ..
+            } => Type::from(&value),
+            _ => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::MismatchedTokenType(TokenType::Type, token.clone().r#type),
+                    token.clone(),
+                    "The \"as\" keyword should always be followed by a type",
+                ));
+            }
+        };
+        Ok(Instruction::new(
+            InstructionType::TypeCast {
+                instruction: Box::new(last_instruction),
+                r#type,
+            },
+            token,
+        ))
     }
 
     fn parse_regex_literal(&mut self) -> Result<Instruction, ParseError> {
@@ -167,6 +199,26 @@ impl Parser {
         } else {
             Ok(Instruction::new(
                 InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
+                token,
+            ))
+        }
+    }
+
+    fn parse_integer_literal(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        if token.r#type != TokenType::IntegerLiteral {
+            self.tokens.advance_to_next_instruction();
+            Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType(
+                    TokenType::IntegerLiteral,
+                    token.clone().r#type,
+                ),
+                token.clone(),
+                format!("Token {:?} is not an integer literal", token.value),
+            ))
+        } else {
+            Ok(Instruction::new(
+                InstructionType::IntegerLiteral(token.value.parse().unwrap()),
                 token,
             ))
         }

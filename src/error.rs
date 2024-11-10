@@ -19,6 +19,11 @@ pub enum ParseErrorType {
     },
     MismatchedTokenType(TokenType, TokenType),
 
+    TypeCast {
+        from: Type,
+        to: Type,
+    },
+
     RegexError,
 
     VariableNotDefined,
@@ -57,6 +62,10 @@ impl std::fmt::Display for ParseErrorType {
                     "Mismatched token type: Expected {}, got {}",
                     type1, type2
                 )
+            }
+
+            ParseErrorType::TypeCast { from, to } => {
+                write!(f, "Type cast error: Cannot cast {} to {}", from, to)
             }
 
             ParseErrorType::RegexError => write!(f, "Regex error"),
@@ -147,31 +156,22 @@ impl ParseWarning {
 }
 
 pub enum InterpreterErrorType {
-    IncompatibleTypes(InstructionResult, InstructionResult),
-    IncompatibleTypesBinary(
-        InstructionResult,
-        InstructionResult,
-        InstructionResult,
-        InstructionResult,
-    ),
+    TypeCastError {
+        result: InstructionResult,
+        from: Type,
+        to: Type,
+    },
 }
 
 impl std::fmt::Display for InterpreterErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            InterpreterErrorType::IncompatibleTypes(expected, actual) => {
-                write!(f, "Expected type: {}, got: {}", expected, actual)
+            InterpreterErrorType::TypeCastError { result, from, to } => {
+                write!(
+                    f,
+                    "Type cast error: Could not cast {from} \"{result}\" to `{to}`",
+                )
             }
-            InterpreterErrorType::IncompatibleTypesBinary(
-                left_expected,
-                left,
-                right_expected,
-                right,
-            ) => write!(
-                f,
-                "Expected types: {} {} got: {} {}",
-                left_expected, right_expected, left, right
-            ),
         }
     }
 }
