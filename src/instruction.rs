@@ -4,6 +4,11 @@ use crate::token::{Token, TokenType};
 use crate::variable::Variable;
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum BinaryOperator {
+    Addition,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BuiltIn {
     Input(Box<Instruction>),
     Output(Box<Instruction>),
@@ -63,7 +68,10 @@ impl Instruction {
 pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
+    IntegerLiteral(i64),
+
     BuiltIn(BuiltIn),
+
     Block(Vec<Instruction>),
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
@@ -72,9 +80,15 @@ pub enum InstructionType {
     IterableAssignment(Variable, Box<Instruction>),
     Variable(Variable),
 
-    Addition {
+    BinaryOperation {
+        operator: BinaryOperator,
         left: Box<Instruction>,
         right: Box<Instruction>,
+    },
+
+    TypeCast {
+        instruction: Box<Instruction>,
+        r#type: Type,
     },
 
     None,

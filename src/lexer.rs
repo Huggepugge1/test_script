@@ -15,8 +15,9 @@ impl<'a> Lexer<'a> {
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
             "for" | "let" => TokenType::Keyword,
-            "string" | "regex" => TokenType::Type,
+            "string" | "regex" | "int" => TokenType::Type,
             "in" => TokenType::AssignmentOperator,
+            "as" => TokenType::BinaryOperator,
             "input" | "output" | "print" | "println" => TokenType::BuiltIn,
             _ => TokenType::Identifier,
         }
@@ -129,8 +130,27 @@ impl<'a> Lexer<'a> {
                     line,
                     column,
                 )),
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
+                'a'..='z' | 'A'..='Z' | '_' => {
                     tokens.push(self.tokenize_identifier(line, &mut column));
+                    continue;
+                }
+                '0'..='9' => {
+                    let start_column = column.clone();
+                    let mut current = String::new();
+                    while let Some(next) = self.contents.peek() {
+                        if !next.is_numeric() {
+                            break;
+                        }
+                        current.push(*next);
+                        self.contents.next();
+                        column += 1;
+                    }
+                    tokens.push(Token::new(
+                        TokenType::IntegerLiteral,
+                        &current,
+                        line,
+                        start_column,
+                    ));
                     continue;
                 }
                 '/' => {
