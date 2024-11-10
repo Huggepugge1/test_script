@@ -193,7 +193,6 @@ impl Test {
                 (var, self.interpret_instruction(*instruction)?)
             }
             _ => {
-                println!("{:?}", assignment);
                 unreachable!();
             }
         };
@@ -249,7 +248,6 @@ impl Test {
 
             InstructionType::None => InstructionResult::None,
             _ => {
-                println!("{:?}", instruction);
                 unreachable!();
             }
         })

@@ -40,7 +40,6 @@ impl Instruction {
     }
 
     pub fn get_variable_name(&self) -> Result<String, ParseError> {
-        println!("{:?}", self);
         match &self.r#type {
             InstructionType::IterableAssignment(var, _instruction) => Ok(var.name.clone()),
             InstructionType::Assignment(var, _instruction) => Ok(var.name.clone()),

@@ -67,7 +67,12 @@ Creates an iterable containing all the different combinations that the Regex mat
 /\d/ would create an iterable containg all digits 0-9.
 
 ## Operators
-The only operator available is the `+`.
+There are only two operators, `=` and `+`.
+
+### Assignment
+Assigns the value of b to a. The let keyword is not needed when assigning a value to a variable that has not yet been defined.
+#### Syntax
+`a = b`<br>
 
 ### Plus
 Concatenates the two strings a and b.
