@@ -1,7 +1,8 @@
+use crate::environment::Environment;
 use crate::error::{InterpreterError, InterpreterErrorType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
+use crate::r#type::Type;
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::process::{Child, Command, Stdio};
 
@@ -26,7 +27,7 @@ struct Test {
     name: String,
     command: String,
     instruction: Instruction,
-    variables: HashMap<String, InstructionResult>,
+    environment: Environment,
     input: Vec<String>,
     output: Vec<String>,
 }
@@ -38,7 +39,7 @@ impl Test {
             command,
 
             instruction,
-            variables: HashMap::new(),
+            environment: Environment::new(),
             input: Vec::new(),
             output: Vec::new(),
         }
@@ -158,35 +159,49 @@ impl Test {
         Ok(InstructionResult::None)
     }
 
+    fn interpret_assignment(
+        &mut self,
+        var: String,
+        _type: Type,
+        instruction: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let value = self.interpret_instruction(instruction)?;
+        self.environment.insert(var.clone(), value.clone());
+        Ok(value)
+    }
+
     fn interpret_block(
         &mut self,
         instructions: Vec<Instruction>,
     ) -> Result<InstructionResult, InterpreterError> {
         let mut result = InstructionResult::None;
+        self.environment.add_scope();
         for instruction in instructions {
             result = self.interpret_instruction(instruction)?;
         }
+        self.environment.remove_scope();
         Ok(result)
     }
 
     fn interpret_for(
         &mut self,
-        instruction: Instruction,
         assignment: Instruction,
+        instruction: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
         let mut result = InstructionResult::None;
         let (assignment_var, assignment_values) = match assignment.r#type {
-            InstructionType::IterableAssignment(var, instruction) => {
+            InstructionType::IterableAssignment(var, _type, instruction) => {
                 (var, self.interpret_instruction(*instruction)?)
             }
             _ => {
+                println!("{:?}", assignment);
                 unreachable!();
             }
         };
         match assignment_values {
             InstructionResult::Regex(values) => {
                 for value in values {
-                    self.variables
+                    self.environment
                         .insert(assignment_var.clone(), InstructionResult::String(value));
                     result = self.interpret_instruction(instruction.clone())?;
                 }
@@ -205,7 +220,7 @@ impl Test {
     }
 
     fn interpret_variable(&self, var: String) -> Result<InstructionResult, InterpreterError> {
-        match self.variables.get(&var) {
+        match self.environment.get(&var) {
             Some(value) => Ok(value.clone()),
             None => unreachable!(),
         }
@@ -223,10 +238,13 @@ impl Test {
             InstructionType::Variable(var) => self.interpret_variable(var)?,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
 
-            InstructionType::For(instruction, assignment) => {
-                self.interpret_for(*instruction, *assignment)?
+            InstructionType::For(assignment, instruction) => {
+                self.interpret_for(*assignment, *instruction)?
             }
             InstructionType::Block(instructions) => self.interpret_block(instructions)?,
+            InstructionType::Assignment(var, r#type, instruction) => {
+                self.interpret_assignment(var, r#type, *instruction)?
+            }
 
             InstructionType::None => InstructionResult::None,
             _ => {

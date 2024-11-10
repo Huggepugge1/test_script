@@ -8,9 +8,20 @@ test_name("command") { ... }
 ```
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
-
 ## Types
 There are two types, `string` and `regex`.
+
+## Variables
+Variables are declared with the `let` keyword. They need to have a known type at compile time. At this time the only effect of the type is visual, as the language is not type checked yet.
+
+### Example
+`let a: string = "Hello, World!"`;
+
+## Blocks
+Blocks are defined by curly braces `{ ... }`.
+They are used to group statements together.
+The block itself is a statement that returns the value of the last statement in the block.
+A block also creates a new scope meaning that any variable declared inside the block is not accessible outside the block.
 
 ## Input and Output
 The language is designed to test IO. There is two builtins that handle IO, `input` and `output`.
@@ -40,9 +51,9 @@ Print the string to the console. Adds a newline at the end of the string.
 The only loop available is the for loop.
 
 ### For
-For each element in the iterable, name it var_name and run the block.
+For each element in the iterable, name it var_name and run the next statement.
 #### Syntax
-`for var_name in iterable { ... }`<br>
+`for var_name: var_type in iterable { ... }`<br>
 
 ## Iterables
 The only iterable available is the regular expression (regex).
@@ -56,7 +67,7 @@ Creates an iterable containing all the different combinations that the Regex mat
 /\d/ would create an iterable containg all digits 0-9.
 
 ## Operators
-Tho only operators available are the `+`.
+The only operator available is the `+`.
 
 ### Plus
 Concatenates the two strings a and b.

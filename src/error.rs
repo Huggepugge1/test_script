@@ -1,7 +1,7 @@
 use crate::interpreter::InstructionResult;
 use crate::token::{Token, TokenType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
     UnexpectedToken,
     UnexpectedEndOfFile,
@@ -12,6 +12,8 @@ pub enum ParseErrorType {
     TestError,
 
     NotImplemented,
+
+    None,
 }
 
 impl std::fmt::Display for ParseErrorType {
@@ -32,6 +34,8 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::TestError => write!(f, "Test error"),
 
             ParseErrorType::NotImplemented => write!(f, "Not implemented"),
+
+            ParseErrorType::None => write!(f, ""),
         }
     }
 }
@@ -52,7 +56,18 @@ impl ParseError {
         }
     }
 
+    pub fn none() -> ParseError {
+        ParseError {
+            r#type: ParseErrorType::None,
+            token: Token::none(),
+            hint: String::new(),
+        }
+    }
+
     pub fn print(&self) {
+        if self.r#type == ParseErrorType::None {
+            return;
+        }
         eprintln!(
             "Error: {} {:?}, {}:{}\n\
              Hint: {}\n",

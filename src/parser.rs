@@ -1,14 +1,14 @@
 use crate::cli::Args;
+use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
+use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
 
-use std::collections::HashSet;
-
 pub struct Parser {
     tokens: TokenCollection,
-    variables: HashSet<String>,
+    environment: ParseEnvironment,
     args: Args,
     success: bool,
 }
@@ -17,7 +17,7 @@ impl Parser {
     pub fn new(tokens: TokenCollection, args: Args) -> Self {
         return Self {
             tokens,
-            variables: HashSet::new(),
+            environment: ParseEnvironment::new(),
             args,
             success: true,
         };
@@ -41,9 +41,9 @@ impl Parser {
 
             match instruction {
                 Ok(instruction) => program.push(instruction),
-                Err(error) => match error.r#type {
+                Err(e) => match e.r#type {
                     ParseErrorType::TestError => (),
-                    _ => error.print(),
+                    _ => e.print(),
                 },
             }
         }
@@ -169,18 +169,24 @@ impl Parser {
     fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
         let token = self.peek_next_token()?;
         match token.value.as_str() {
+            "let" => self.parse_assignment(),
             "for" => self.parse_for(),
-            "in" => Err(ParseError::new(
-                ParseErrorType::UnexpectedToken,
-                token.clone(),
-                "\"in\" is not allowed outside of a for loop",
-            )),
+            "in" => {
+                self.tokens.advance_to_next_instruction();
+                Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken,
+                    token.clone(),
+                    "\"in\" is not allowed outside of a for loop",
+                ))
+            }
             _ => unreachable!(),
         }
     }
 
     fn parse_assignment(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
         let identifier = self.get_next_token()?;
+        let identifier_name = identifier.value.clone();
         if identifier.r#type != TokenType::Identifier {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
@@ -189,27 +195,59 @@ impl Parser {
                 "A \"for\" or \"let\" keyword should always be followed by an identifier",
             ));
         }
+
+        self.expect_token(TokenType::Colon)?;
+
+        let r#type = self.get_next_token()?;
+        if r#type.r#type != TokenType::Type {
+            self.tokens.advance_to_next_instruction();
+            return Err(ParseError::new(
+                ParseErrorType::MismatchedType(TokenType::Type, r#type.r#type.clone()),
+                r#type,
+                "A colon should always be followed by a type in an assignment",
+            ));
+        }
+        let r#type = Type::from(&r#type.value.clone());
+
         let assignment = self.get_next_token()?;
         if assignment.r#type != TokenType::AssignmentOperator {
+            self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType(
                     TokenType::AssignmentOperator,
                     assignment.r#type.clone(),
                 ),
                 assignment,
-                "An identifier should be followed by an assignment operator in an assignment",
+                "A type should be followed by an assignment operator in an assingnment",
             ));
         }
         let instruction = self.parse_expression()?;
-        Ok(Instruction::new(
-            InstructionType::IterableAssignment(identifier.value.clone(), Box::new(instruction)),
-            identifier,
-        ))
+        match assignment.value.as_str() {
+            "=" => {
+                self.environment.insert(identifier.value.clone(), r#type);
+                Ok(Instruction::new(
+                    InstructionType::Assignment(identifier_name, r#type, Box::new(instruction)),
+                    token,
+                ))
+            }
+            "in" => {
+                self.environment.insert(identifier.value.clone(), r#type);
+                Ok(Instruction::new(
+                    InstructionType::IterableAssignment(
+                        identifier.value.clone(),
+                        r#type,
+                        Box::new(instruction),
+                    ),
+                    token,
+                ))
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn parse_identifier(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        if !self.variables.contains(&token.value) {
+        if self.environment.get(&token.value).is_none() {
             self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
                 ParseErrorType::VariableNotDefined,
@@ -259,9 +297,12 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> Result<Instruction, ParseError> {
-        let mut token = self.get_next_token()?;
+        let token = self.get_next_token()?;
         let mut block = Vec::new();
-        while token.r#type != TokenType::CloseBlock {
+        self.environment.add_scope();
+
+        let mut next_token = self.peek_next_token()?;
+        while next_token.r#type != TokenType::CloseBlock {
             match self.parse_statement() {
                 Ok(instruction) => block.push(instruction),
                 Err(e) => {
@@ -269,23 +310,49 @@ impl Parser {
                     self.success = false;
                 }
             }
-            token = self.peek_next_token()?;
+            next_token = self.peek_next_token()?;
         }
+        self.environment.remove_scope();
         Ok(Instruction::new(InstructionType::Block(block), token))
     }
 
     fn parse_for(&mut self) -> Result<Instruction, ParseError> {
-        let token = self.get_next_token()?;
+        let token = self.peek_next_token()?;
 
-        let assignment = self.parse_assignment()?;
-        self.variables.insert(assignment.get_variable_name()?);
+        self.environment.add_scope();
 
-        let statement = self.parse_expression()?;
+        let assignment = self.parse_assignment();
+        match assignment {
+            Ok(ref assignment) => {
+                let name = assignment.get_variable_name().unwrap();
+                let r#type = assignment.get_variable_type().unwrap();
+                self.environment.insert(name, r#type);
+            }
 
-        Ok(Instruction::new(
-            InstructionType::For(Box::new(statement), Box::new(assignment)),
-            token,
-        ))
+            Err(ref e) => {
+                e.print();
+                self.success = false;
+            }
+        }
+
+        let statement = self.parse_statement();
+        self.environment.remove_scope();
+        let statement = match statement {
+            Ok(statement) => statement,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
+        self.tokens.back();
+
+        match assignment {
+            Ok(assignment) => Ok(Instruction::new(
+                InstructionType::For(Box::new(assignment), Box::new(statement)),
+                token,
+            )),
+            Err(_) => Err(ParseError::none()),
+        }
     }
 
     fn expect_token(&mut self, expected: TokenType) -> Result<(), ParseError> {
@@ -386,8 +453,16 @@ impl Parser {
                     self.warn_instruction(&instruction);
                 }
             }
+            InstructionType::Assignment(_, _, instruction) => {
+                if !instruction.literal() {
+                    self.warn_instruction(instruction)
+                }
+            }
             InstructionType::Test(instruction, _, _) => self.warn_instruction(instruction),
-            InstructionType::For(instruction, _) => self.warn_instruction(instruction),
+            InstructionType::For(assignment, instruction) => {
+                self.warn_instruction(assignment);
+                self.warn_instruction(instruction);
+            }
             _ => (),
         }
     }

@@ -2,9 +2,15 @@
 pub enum TokenType {
     StringLiteral,
     RegexLiteral,
+
     Keyword,
     BuiltIn,
+
+    Type,
+    Colon,
+
     Identifier,
+
     OpenBlock,
     CloseBlock,
     OpenParen,
@@ -23,9 +29,15 @@ impl std::fmt::Display for TokenType {
         match self {
             TokenType::StringLiteral => write!(f, "String literal"),
             TokenType::RegexLiteral => write!(f, "Regex literal"),
+
             TokenType::Keyword => write!(f, "Keyword"),
             TokenType::BuiltIn => write!(f, "BuiltIn"),
+
+            TokenType::Type => write!(f, "Type"),
+            TokenType::Colon => write!(f, "Colon"),
+
             TokenType::Identifier => write!(f, "Identifier"),
+
             TokenType::OpenBlock => write!(f, "OpenBlock"),
             TokenType::CloseBlock => write!(f, "CloseBlock"),
             TokenType::OpenParen => write!(f, "OpenParen"),
@@ -56,6 +68,15 @@ impl Token {
             value: value.to_string(),
             line,
             column,
+        }
+    }
+
+    pub fn none() -> Token {
+        Token {
+            r#type: TokenType::None,
+            value: String::new(),
+            line: 0,
+            column: 0,
         }
     }
 
@@ -125,7 +146,10 @@ impl TokenCollection {
 
     pub fn advance_to_next_instruction(&mut self) {
         while let Some(token) = self.next() {
-            if token.r#type == TokenType::Semicolon {
+            if token.r#type == TokenType::Semicolon || token.r#type == TokenType::CloseBlock {
+                break;
+            } else if token.r#type == TokenType::OpenBlock {
+                self.back();
                 break;
             }
         }

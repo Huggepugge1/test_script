@@ -2,7 +2,8 @@ use crate::token::{Token, TokenCollection, TokenType};
 
 fn identifier_type(value: &String) -> TokenType {
     match value.as_str() {
-        "for" => TokenType::Keyword,
+        "for" | "let" => TokenType::Keyword,
+        "string" | "regex" => TokenType::Type,
         "in" => TokenType::AssignmentOperator,
         "input" | "output" | "print" | "println" => TokenType::BuiltIn,
         _ => TokenType::Identifier,
@@ -118,6 +119,13 @@ pub fn tokenize(contents: String) -> TokenCollection {
             '+' => tokens.push(Token::new(
                 TokenType::BinaryOperator,
                 &"+".to_string(),
+                line,
+                column,
+            )),
+            ':' => tokens.push(Token::new(TokenType::Colon, &":".to_string(), line, column)),
+            '=' => tokens.push(Token::new(
+                TokenType::AssignmentOperator,
+                &"=".to_string(),
                 line,
                 column,
             )),
