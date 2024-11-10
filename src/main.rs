@@ -9,6 +9,7 @@ mod regex;
 mod test;
 mod token;
 mod r#type;
+mod type_checker;
 mod variable;
 
 fn main() {

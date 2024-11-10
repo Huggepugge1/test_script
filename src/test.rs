@@ -1,13 +1,17 @@
-use crate::{cli, interpreter, lexer, parser};
+use crate::{cli, interpreter, lexer, parser, type_checker};
 
 pub fn run(args: cli::Args) {
-    let contents = std::fs::read_to_string(args.file.clone()).expect("File not found");
+    let mut contents = std::fs::read_to_string(args.file.clone()).expect("File not found");
 
-    let tokens = lexer::tokenize(contents);
-    let mut parser = parser::Parser::new(tokens, args);
-    let program = parser.parse();
+    let tokens = lexer::Lexer::new(&mut contents).tokenize();
+
+    let program = parser::Parser::new(tokens, args.clone()).parse();
+
     match program {
-        Ok(program) => interpreter::Interpreter::new(program).interpret(),
+        Ok(program) => match type_checker::TypeChecker::new(program.clone(), args).check() {
+            Ok(()) => interpreter::Interpreter::new(program).interpret(),
+            Err(_) => (),
+        },
         Err(_) => (),
     }
 }

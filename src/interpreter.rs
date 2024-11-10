@@ -233,7 +233,7 @@ impl Test {
         Ok(match instruction.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
-            InstructionType::Addition(left, right) => self.interpret_addition(*left, *right)?,
+            InstructionType::Addition { left, right } => self.interpret_addition(*left, *right)?,
 
             InstructionType::Variable(var) => self.interpret_variable(var)?,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
