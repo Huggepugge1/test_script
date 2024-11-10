@@ -9,7 +9,10 @@ pub enum TokenType {
     CloseBlock,
     OpenParen,
     CloseParen,
+    AssignmentOperator,
     Semicolon,
+
+    None,
 }
 
 impl std::fmt::Display for TokenType {
@@ -24,7 +27,10 @@ impl std::fmt::Display for TokenType {
             TokenType::CloseBlock => write!(f, "CloseBlock"),
             TokenType::OpenParen => write!(f, "OpenParen"),
             TokenType::CloseParen => write!(f, "CloseParen"),
+            TokenType::AssignmentOperator => write!(f, "Assignment operator"),
             TokenType::Semicolon => write!(f, "Semicolon"),
+
+            TokenType::None => write!(f, ""),
         }
     }
 }
@@ -45,10 +51,6 @@ impl Token {
             line,
             column,
         }
-    }
-
-    pub fn assignment(&self) -> bool {
-        self.r#type == TokenType::Keyword && self.value == "in"
     }
 
     pub fn operator(&self) -> bool {
@@ -85,8 +87,10 @@ impl TokenCollection {
     pub fn peek(&self) -> Option<Token> {
         if (self.index + 1) >= self.tokens.len() {
             None
-        } else {
+        } else if self.started {
             Some(self.tokens[self.index + 1].clone())
+        } else {
+            Some(self.tokens[self.index].clone())
         }
     }
 

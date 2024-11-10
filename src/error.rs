@@ -6,7 +6,6 @@ pub enum ParseErrorType {
     UnexpectedEndOfFile,
     MismatchedType(TokenType, TokenType),
     RegexError,
-    VariableAlreadyDefined,
     VariableNotDefined,
 
     TestError,
@@ -27,7 +26,6 @@ impl std::fmt::Display for ParseErrorType {
                 )
             }
             ParseErrorType::RegexError => write!(f, "Regex error"),
-            ParseErrorType::VariableAlreadyDefined => write!(f, "Variable already defined"),
             ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
 
             ParseErrorType::TestError => write!(f, "Test error"),

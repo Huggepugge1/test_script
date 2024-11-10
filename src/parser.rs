@@ -18,14 +18,14 @@ impl Parser {
             tokens,
             variables: HashSet::new(),
             max_size,
-            success: false,
+            success: true,
         };
     }
 
     pub fn parse(&mut self) -> Result<Vec<Instruction>, ParseError> {
         let mut program = Vec::new();
 
-        while let Some(token) = self.tokens.next() {
+        while let Some(token) = self.tokens.peek() {
             let instruction = match token.clone().r#type {
                 TokenType::Identifier => self.parse_test(),
                 r#type => {
@@ -152,7 +152,7 @@ impl Parser {
     }
 
     fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
-        let token = self.get_next_token()?;
+        let token = self.peek_next_token()?;
         match token.value.as_str() {
             "for" => self.parse_for(),
             "in" => Err(ParseError::new(
@@ -165,20 +165,30 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Result<Instruction, ParseError> {
-        let token = self.get_next_token()?;
         let identifier = self.get_next_token()?;
         if identifier.r#type != TokenType::Identifier {
-            self.tokens.back();
+            self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::Identifier, identifier.r#type),
-                token,
+                ParseErrorType::MismatchedType(TokenType::Identifier, identifier.r#type.clone()),
+                identifier,
                 "A \"for\" or \"let\" keyword should always be followed by an identifier",
+            ));
+        }
+        let assignment = self.get_next_token()?;
+        if assignment.r#type != TokenType::AssignmentOperator {
+            return Err(ParseError::new(
+                ParseErrorType::MismatchedType(
+                    TokenType::AssignmentOperator,
+                    assignment.r#type.clone(),
+                ),
+                assignment,
+                "An identifier should be followed by an assignment operator in an assignment",
             ));
         }
         let instruction = self.parse_expression()?;
         Ok(Instruction::new(
-            InstructionType::IterableAssignment(identifier.value, Box::new(instruction)),
-            token,
+            InstructionType::IterableAssignment(identifier.value.clone(), Box::new(instruction)),
+            identifier,
         ))
     }
 
@@ -205,7 +215,10 @@ impl Parser {
         let close_paren = self.get_next_token()?;
         let instruction = match close_paren.r#type {
             TokenType::CloseParen => Ok(Instruction::NONE),
-            _ => self.parse_expression(),
+            _ => {
+                self.tokens.back();
+                self.parse_expression()
+            }
         }?;
 
         self.expect_token(TokenType::CloseParen)?;
@@ -231,12 +244,9 @@ impl Parser {
     }
 
     fn parse_block(&mut self) -> Result<Instruction, ParseError> {
-        let token = self.get_next_token()?;
+        let mut token = self.get_next_token()?;
         let mut block = Vec::new();
-        while let Some(token) = self.tokens.peek() {
-            if token.r#type == TokenType::CloseBlock {
-                break;
-            }
+        while token.r#type != TokenType::CloseBlock {
             match self.parse_statement() {
                 Ok(instruction) => block.push(instruction),
                 Err(e) => {
@@ -244,18 +254,21 @@ impl Parser {
                     self.success = false;
                 }
             }
+            token = self.peek_next_token()?;
         }
         Ok(Instruction::new(InstructionType::Block(block), token))
     }
 
     fn parse_for(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        let assignment = self.parse_assignment()?;
 
-        let instruction = self.parse_statement()?;
+        let assignment = self.parse_assignment()?;
+        self.variables.insert(assignment.get_variable_name()?);
+
+        let statement = self.parse_expression()?;
 
         Ok(Instruction::new(
-            InstructionType::For(Box::new(instruction), Box::new(assignment)),
+            InstructionType::For(Box::new(statement), Box::new(assignment)),
             token,
         ))
     }
@@ -276,15 +289,16 @@ impl Parser {
 
     fn end_statement(&mut self) -> Result<(), ParseError> {
         let token = self.get_next_token()?;
-        if token.r#type == TokenType::Semicolon || token.r#type == TokenType::CloseBlock {
-            Ok(())
-        } else {
-            self.tokens.back();
-            Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
-                token,
-                "Did you forget a semicolon?",
-            ))
+        match token.r#type {
+            TokenType::Semicolon | TokenType::CloseBlock => Ok(()),
+            _ => {
+                self.tokens.back();
+                Err(ParseError::new(
+                    ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
+                    token,
+                    "Did you forget a semicolon?",
+                ))
+            }
         }
     }
 

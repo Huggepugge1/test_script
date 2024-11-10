@@ -2,7 +2,8 @@ use crate::token::{Token, TokenCollection, TokenType};
 
 fn identifier_type(value: &String) -> TokenType {
     match value.as_str() {
-        "for" | "in" => TokenType::Keyword,
+        "for" => TokenType::Keyword,
+        "in" => TokenType::AssignmentOperator,
         "input" | "output" | "print" | "println" => TokenType::BuiltIn,
         _ => TokenType::Identifier,
     }

@@ -3,7 +3,6 @@ use crate::instruction::{BuiltIn, Instruction, InstructionType};
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
-use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 #[derive(Debug, Clone)]
@@ -15,21 +14,20 @@ enum InstructionResult {
 
 struct Test {
     name: String,
-    file: PathBuf,
-
-    test: Instruction,
+    command: String,
+    instruction: Instruction,
     variables: HashMap<String, InstructionResult>,
     input: Vec<String>,
     output: Vec<String>,
 }
 
 impl Test {
-    fn new(name: String, file: PathBuf, test: Instruction) -> Self {
+    fn new(name: String, command: String, instruction: Instruction) -> Self {
         Self {
             name,
-            file,
+            command,
 
-            test,
+            instruction,
             variables: HashMap::new(),
             input: Vec::new(),
             output: Vec::new(),
@@ -37,7 +35,7 @@ impl Test {
     }
 
     fn run_test(&mut self) -> Result<(), ()> {
-        let mut process = Process::spawn(self.file.clone()).expect("Failed to run test");
+        let mut process = Process::spawn(self.command.clone()).expect("Failed to run test");
         let mut buffer = String::new();
         for line in self.input.clone() {
             buffer.push_str(&line);
@@ -60,7 +58,7 @@ impl Test {
             if self.output[i] != *line {
                 self.fail(&format!(
                     "Expected output: {:?}, got: {:?}",
-                    line, self.output[i]
+                    self.output[i], line
                 ));
                 return Err(());
             }
@@ -71,14 +69,12 @@ impl Test {
     }
 
     fn run(&mut self) {
-        for expression in self.expressions.clone() {
-            match self.interpret_instruction(expression) {
-                Ok(_) => (),
-                Err(e) => {
-                    self.fail("Failed to interpret expression");
-                    e.print();
-                    return;
-                }
+        let instruction = self.instruction.clone();
+        match self.interpret_instruction(instruction) {
+            Ok(_) => (),
+            Err(e) => {
+                e.print();
+                return;
             }
         }
 
@@ -125,6 +121,17 @@ impl Test {
         Ok(InstructionResult::None)
     }
 
+    fn interpret_block(
+        &mut self,
+        instructions: Vec<Instruction>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let mut result = InstructionResult::None;
+        for instruction in instructions {
+            result = self.interpret_instruction(instruction)?;
+        }
+        Ok(result)
+    }
+
     fn interpret_for(
         &mut self,
         instruction: Instruction,
@@ -144,7 +151,7 @@ impl Test {
                 for value in values {
                     self.variables
                         .insert(assignment_var.clone(), InstructionResult::String(value));
-                    self.interpret_instruction(instruction.clone());
+                    result = self.interpret_instruction(instruction.clone())?;
                 }
             }
             _ => {
@@ -179,8 +186,10 @@ impl Test {
             InstructionType::For(instruction, assignment) => {
                 self.interpret_for(*instruction, *assignment)?
             }
+            InstructionType::Block(instructions) => self.interpret_block(instructions)?,
             InstructionType::None => InstructionResult::None,
             _ => {
+                println!("{:?}", instruction);
                 unreachable!();
             }
         })
@@ -192,8 +201,10 @@ struct Process {
 }
 
 impl Process {
-    fn spawn(command: PathBuf) -> Result<Self, Error> {
-        let child = Command::new(command)
+    fn spawn(command: String) -> Result<Self, Error> {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg(command)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
@@ -244,13 +255,13 @@ impl Interpreter {
         Self { program }
     }
 
-    fn interpret_test(&self, test: Instruction) {
-        match test.r#type {
-            InstructionType::Test(expressions, name, file) => {
-                let mut test = Test::new(name, file, instruction);
+    fn interpret_test(&self, instruction: Instruction) {
+        match instruction.r#type {
+            InstructionType::Test(instruction, name, file) => {
+                let mut test = Test::new(name, file, *instruction);
                 test.run();
             }
-            _ => panic!("Unexpected instruction {:?}", test),
+            _ => panic!("Unexpected instruction {:?}", instruction),
         }
     }
 
