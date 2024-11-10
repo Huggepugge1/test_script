@@ -140,10 +140,6 @@ impl TokenCollection {
         }
     }
 
-    pub fn push(&mut self, token: Token) {
-        self.tokens.push(token);
-    }
-
     pub fn advance_to_next_instruction(&mut self) {
         while let Some(token) = self.next() {
             if token.r#type == TokenType::Semicolon || token.r#type == TokenType::CloseBlock {

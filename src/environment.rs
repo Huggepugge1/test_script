@@ -1,5 +1,6 @@
 use crate::interpreter::InstructionResult;
 use crate::r#type::Type;
+use crate::variable::Variable;
 
 use std::collections::HashMap;
 
@@ -22,8 +23,11 @@ impl ParseEnvironment {
         self.variables.pop();
     }
 
-    pub fn insert(&mut self, name: String, r#type: Type) {
-        self.variables.last_mut().unwrap().insert(name, r#type);
+    pub fn insert(&mut self, var: Variable) {
+        self.variables
+            .last_mut()
+            .unwrap()
+            .insert(var.name, var.r#type);
     }
 
     pub fn get(&self, name: &str) -> Option<&Type> {

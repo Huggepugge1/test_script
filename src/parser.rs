@@ -1,6 +1,6 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
-use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
+use crate::error::{ParseError, ParseErrorType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
 use crate::r#type::Type;
 use crate::regex;
@@ -33,7 +33,7 @@ impl Parser {
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
-                        ParseErrorType::MismatchedType(TokenType::Identifier, r#type),
+                        ParseErrorType::MismatchedTokenType(TokenType::Identifier, r#type),
                         token,
                         "Only test names are allowed in the main scope",
                     ))
@@ -50,12 +50,7 @@ impl Parser {
         }
 
         match self.success {
-            true => {
-                if !self.args.disable_warnings {
-                    self.warn(&program);
-                }
-                Ok(program)
-            }
+            true => Ok(program),
 
             false => Err(ParseError::new(
                 ParseErrorType::TestError,
@@ -123,7 +118,7 @@ impl Parser {
         if token.r#type != TokenType::StringLiteral {
             self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::StringLiteral, token.clone().r#type),
+                ParseErrorType::MismatchedTokenType(TokenType::StringLiteral, token.clone().r#type),
                 token.clone(),
                 format!("Token {:?} is not a string literal", token.value),
             ))
@@ -139,10 +134,10 @@ impl Parser {
         let token = self.get_next_token()?;
         match token.value.as_str() {
             "+" => Ok(Instruction::new(
-                InstructionType::Addition(
-                    Box::new(last_instruction),
-                    Box::new(self.parse_expression()?),
-                ),
+                InstructionType::Addition {
+                    left: Box::new(last_instruction),
+                    right: Box::new(self.parse_expression()?),
+                },
                 token,
             )),
             "=" => Ok(Instruction::new(
@@ -165,7 +160,7 @@ impl Parser {
         if token.r#type != TokenType::RegexLiteral {
             self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::RegexLiteral, token.clone().r#type),
+                ParseErrorType::MismatchedTokenType(TokenType::RegexLiteral, token.clone().r#type),
                 token.clone(),
                 format!("Token {:?} is not a regex literal", token.value),
             ))
@@ -201,7 +196,10 @@ impl Parser {
         if identifier.r#type != TokenType::Identifier {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::Identifier, identifier.r#type.clone()),
+                ParseErrorType::MismatchedTokenType(
+                    TokenType::Identifier,
+                    identifier.r#type.clone(),
+                ),
                 identifier,
                 "A \"for\" or \"let\" keyword should always be followed by an identifier",
             ));
@@ -213,7 +211,7 @@ impl Parser {
         if r#type.r#type != TokenType::Type {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::MismatchedType(TokenType::Type, r#type.r#type.clone()),
+                ParseErrorType::MismatchedTokenType(TokenType::Type, r#type.r#type.clone()),
                 r#type,
                 "A colon should always be followed by a type in an assignment",
             ));
@@ -224,7 +222,7 @@ impl Parser {
         if assignment.r#type != TokenType::AssignmentOperator {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::MismatchedType(
+                ParseErrorType::MismatchedTokenType(
                     TokenType::AssignmentOperator,
                     assignment.r#type.clone(),
                 ),
@@ -235,7 +233,8 @@ impl Parser {
         let instruction = self.parse_expression()?;
         match assignment.value.as_str() {
             "=" => {
-                self.environment.insert(identifier.value.clone(), r#type);
+                self.environment
+                    .insert(Variable::new(identifier_name.clone(), r#type.clone()));
                 Ok(Instruction::new(
                     InstructionType::Assignment(
                         Variable::new(identifier_name, r#type),
@@ -245,7 +244,8 @@ impl Parser {
                 ))
             }
             "in" => {
-                self.environment.insert(identifier.value.clone(), r#type);
+                self.environment
+                    .insert(Variable::new(identifier_name.clone(), r#type.clone()));
                 Ok(Instruction::new(
                     InstructionType::IterableAssignment(
                         Variable::new(identifier_name, r#type),
@@ -342,7 +342,7 @@ impl Parser {
             Ok(ref assignment) => {
                 let name = assignment.get_variable_name().unwrap();
                 let r#type = assignment.get_variable_type().unwrap();
-                self.environment.insert(name, r#type);
+                self.environment.insert(Variable::new(name, r#type));
             }
 
             Err(ref e) => {
@@ -376,7 +376,7 @@ impl Parser {
         if token.r#type != expected {
             self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
-                ParseErrorType::MismatchedType(expected, token.clone().r#type),
+                ParseErrorType::MismatchedTokenType(expected, token.clone().r#type),
                 token.clone(),
                 format!("Token {:?} is not of the right type", token.value),
             ))
@@ -392,7 +392,7 @@ impl Parser {
             _ => {
                 self.tokens.back();
                 Err(ParseError::new(
-                    ParseErrorType::MismatchedType(TokenType::Semicolon, token.clone().r#type),
+                    ParseErrorType::MismatchedTokenType(TokenType::Semicolon, token.clone().r#type),
                     token,
                     "Did you forget a semicolon?",
                 ))
@@ -421,65 +421,6 @@ impl Parser {
                 self.tokens.current().unwrap(),
                 "",
             ))
-        }
-    }
-
-    fn warn(&mut self, program: &Vec<Instruction>) {
-        for instruction in program {
-            self.warn_instruction(instruction);
-        }
-    }
-
-    fn warn_instruction(&mut self, instruction: &Instruction) {
-        match &instruction.r#type {
-            InstructionType::None => {
-                ParseWarning::new(
-                    ParseWarningType::TrailingSemicolon,
-                    instruction.token.clone(),
-                    "Remove the extra semicolon",
-                )
-                .print();
-            }
-            InstructionType::StringLiteral(_) => {
-                ParseWarning::new(
-                    ParseWarningType::UnusedValue,
-                    instruction.token.clone(),
-                    "The result of this string literal is not used",
-                )
-                .print();
-            }
-            InstructionType::RegexLiteral(_) => {
-                ParseWarning::new(
-                    ParseWarningType::UnusedValue,
-                    instruction.token.clone(),
-                    "Remove the regex literal",
-                )
-                .print();
-            }
-            InstructionType::Addition(_, _) => {
-                ParseWarning::new(
-                    ParseWarningType::UnusedValue,
-                    instruction.token.clone(),
-                    "The result of this addition is not used",
-                )
-                .print();
-            }
-            InstructionType::Block(block) => {
-                for instruction in block {
-                    self.warn_instruction(&instruction);
-                }
-            }
-            InstructionType::Assignment(_, instruction) => {
-                if !instruction.literal() {
-                    self.warn_instruction(instruction)
-                }
-            }
-            InstructionType::Test(instruction, _, _) => self.warn_instruction(instruction),
-            InstructionType::For(assignment, instruction) => {
-                self.warn_instruction(assignment);
-                self.warn_instruction(instruction);
-            }
-            _ => (),
         }
     }
 }

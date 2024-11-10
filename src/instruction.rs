@@ -32,13 +32,6 @@ impl Instruction {
         Self { r#type, token }
     }
 
-    pub fn literal(&self) -> bool {
-        matches!(
-            self.r#type,
-            InstructionType::StringLiteral(_) | InstructionType::RegexLiteral(_)
-        )
-    }
-
     pub fn get_variable_name(&self) -> Result<String, ParseError> {
         match &self.r#type {
             InstructionType::IterableAssignment(var, _instruction) => Ok(var.name.clone()),
@@ -79,7 +72,10 @@ pub enum InstructionType {
     IterableAssignment(Variable, Box<Instruction>),
     Variable(Variable),
 
-    Addition(Box<Instruction>, Box<Instruction>),
+    Addition {
+        left: Box<Instruction>,
+        right: Box<Instruction>,
+    },
 
     None,
 }

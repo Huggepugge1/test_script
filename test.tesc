@@ -4,11 +4,9 @@ test1("./input_test") {
         input(i);
         output(i);
         print(i + ": ");
-        println(i + i);
+        println(i + i + i);
     }
 
-    digits = "a";
-    println(digits);
     input("q");
     output("q");
 }
