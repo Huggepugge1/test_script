@@ -1,3 +1,4 @@
+use crate::interpreter::InstructionResult;
 use crate::token::{Token, TokenType};
 
 #[derive(Debug)]
@@ -61,8 +62,8 @@ impl ParseError {
 }
 
 pub enum ParseWarningType {
-    UnusedLiteral,
-    ExtraSemicolon,
+    UnusedValue,
+    TrailingSemicolon,
 }
 
 pub struct ParseWarning {
@@ -74,8 +75,8 @@ pub struct ParseWarning {
 impl std::fmt::Display for ParseWarningType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseWarningType::UnusedLiteral => write!(f, "Unused literal"),
-            ParseWarningType::ExtraSemicolon => write!(f, "Extra semicolon"),
+            ParseWarningType::UnusedValue => write!(f, "Unused value"),
+            ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
         }
     }
 }
@@ -91,21 +92,39 @@ impl ParseWarning {
 
     pub fn print(&self) {
         eprintln!(
-            "Warning: {} {:?}, {}:{}\n\
+            "Warning: {}, {}:{}\n\
              Hint: {}\n",
-            self.r#type, self.token.value, self.token.line, self.token.column, self.hint
+            self.r#type, self.token.line, self.token.column, self.hint
         );
     }
 }
 
 pub enum InterpreterErrorType {
-    IncompatibleTypes,
+    IncompatibleTypes(InstructionResult, InstructionResult),
+    IncompatibleTypesBinary(
+        InstructionResult,
+        InstructionResult,
+        InstructionResult,
+        InstructionResult,
+    ),
 }
 
 impl std::fmt::Display for InterpreterErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            InterpreterErrorType::IncompatibleTypes => write!(f, "Incompatible types"),
+            InterpreterErrorType::IncompatibleTypes(expected, actual) => {
+                write!(f, "Expected type: {}, got: {}", expected, actual)
+            }
+            InterpreterErrorType::IncompatibleTypesBinary(
+                left_expected,
+                left,
+                right_expected,
+                right,
+            ) => write!(
+                f,
+                "Expected types: {} {} got: {} {}",
+                left_expected, right_expected, left, right
+            ),
         }
     }
 }

@@ -51,7 +51,11 @@ pub enum InstructionType {
     Block(Vec<Instruction>),
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
+
     IterableAssignment(String, Box<Instruction>),
     Variable(String),
+
+    Addition(Box<Instruction>, Box<Instruction>),
+
     None,
 }

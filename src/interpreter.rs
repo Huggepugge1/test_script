@@ -6,10 +6,20 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::process::{Child, Command, Stdio};
 
 #[derive(Debug, Clone)]
-enum InstructionResult {
+pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
     None,
+}
+
+impl std::fmt::Display for InstructionResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            InstructionResult::String(_) => write!(f, "string"),
+            InstructionResult::Regex(_) => write!(f, "regex"),
+            InstructionResult::None => write!(f, "none"),
+        }
+    }
 }
 
 struct Test {
@@ -92,6 +102,31 @@ impl Test {
         eprintln!("{} failed: {}", self.name, message);
     }
 
+    fn interpret_addition(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::String(left), InstructionResult::String(right)) => {
+                Ok(InstructionResult::String(format!("{}{}", left, right)))
+            }
+            _ => {
+                return Err(InterpreterError::new(
+                    InterpreterErrorType::IncompatibleTypesBinary(
+                        InstructionResult::String(String::new()),
+                        left,
+                        InstructionResult::String(String::new()),
+                        right,
+                    ),
+                    "Expected two strings",
+                ));
+            }
+        }
+    }
+
     fn interpret_builtin(
         &mut self,
         builtin: BuiltIn,
@@ -104,11 +139,13 @@ impl Test {
         };
         let value = match value {
             InstructionResult::String(value) => value,
-            InstructionResult::None => String::new(),
             _ => {
                 return Err(InterpreterError::new(
-                    InterpreterErrorType::IncompatibleTypes,
-                    "Expected a string or nothing",
+                    InterpreterErrorType::IncompatibleTypes(
+                        InstructionResult::String(String::new()),
+                        value,
+                    ),
+                    "Expected a string",
                 ));
             }
         };
@@ -156,7 +193,10 @@ impl Test {
             }
             _ => {
                 return Err(InterpreterError::new(
-                    InterpreterErrorType::IncompatibleTypes,
+                    InterpreterErrorType::IncompatibleTypes(
+                        InstructionResult::Regex(Vec::new()),
+                        assignment_values,
+                    ),
                     "Expected an iterable",
                 ));
             }
@@ -167,10 +207,7 @@ impl Test {
     fn interpret_variable(&self, var: String) -> Result<InstructionResult, InterpreterError> {
         match self.variables.get(&var) {
             Some(value) => Ok(value.clone()),
-            None => Err(InterpreterError::new(
-                InterpreterErrorType::IncompatibleTypes,
-                "Variable not found",
-            )),
+            None => unreachable!(),
         }
     }
 
@@ -181,12 +218,16 @@ impl Test {
         Ok(match instruction.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
+            InstructionType::Addition(left, right) => self.interpret_addition(*left, *right)?,
+
             InstructionType::Variable(var) => self.interpret_variable(var)?,
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
+
             InstructionType::For(instruction, assignment) => {
                 self.interpret_for(*instruction, *assignment)?
             }
             InstructionType::Block(instructions) => self.interpret_block(instructions)?,
+
             InstructionType::None => InstructionResult::None,
             _ => {
                 println!("{:?}", instruction);

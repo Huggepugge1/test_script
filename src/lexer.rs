@@ -115,6 +115,12 @@ pub fn tokenize(contents: String) -> TokenCollection {
                 line,
                 column,
             )),
+            '+' => tokens.push(Token::new(
+                TokenType::BinaryOperator,
+                &"+".to_string(),
+                line,
+                column,
+            )),
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {
                 tokens.push(tokenize_identifier(&mut contents, line, &mut column));
                 continue;

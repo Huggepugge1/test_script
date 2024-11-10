@@ -1,8 +1,11 @@
-test1("valgrind ./input_test") {
-    for i in /[a-z]\d{3}/ {
-        input(i);
-        output(i);
+test1("./input_test") {
+    for i in /[a-z]\d{2}/ {
+        input(i + i);
+        output(i + i);
     }
+    "string";
+    /thathoe/;
+    "iathoeu" + "attoeh";
     input("q");
     output("q");
 }

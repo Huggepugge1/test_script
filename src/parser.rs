@@ -1,4 +1,4 @@
-use crate::error::{ParseError, ParseErrorType};
+use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
@@ -47,6 +47,8 @@ impl Parser {
             }
         }
 
+        self.warn(&program);
+
         match self.success {
             true => Ok(program),
 
@@ -73,7 +75,7 @@ impl Parser {
             TokenType::BuiltIn => self.parse_builtin()?,
             TokenType::Identifier => self.parse_identifier()?,
             TokenType::OpenBlock => self.parse_block()?,
-            TokenType::Semicolon => Instruction::NONE,
+            TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -84,13 +86,12 @@ impl Parser {
             }
         };
 
-        token = self.get_next_token()?;
-        while token.operator() {
-            instruction = self.parse_operator()?;
-            token = self.get_next_token()?;
+        token = self.peek_next_token()?;
+        while token.binary_operator() {
+            instruction = self.parse_operator(instruction)?;
+            token = self.peek_next_token()?;
         }
 
-        self.tokens.back();
         Ok(instruction)
     }
 
@@ -129,8 +130,18 @@ impl Parser {
         }
     }
 
-    fn parse_operator(&mut self) -> Result<Instruction, ParseError> {
-        unreachable!();
+    fn parse_operator(&mut self, last_instruction: Instruction) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        match token.value.as_str() {
+            "+" => Ok(Instruction::new(
+                InstructionType::Addition(
+                    Box::new(last_instruction),
+                    Box::new(self.parse_expression()?),
+                ),
+                token,
+            )),
+            _ => unreachable!(),
+        }
     }
 
     fn parse_regex_literal(&mut self) -> Result<Instruction, ParseError> {
@@ -323,6 +334,57 @@ impl Parser {
                 self.tokens.current().unwrap(),
                 "",
             ))
+        }
+    }
+
+    fn warn(&mut self, program: &Vec<Instruction>) {
+        for instruction in program {
+            self.warn_instruction(instruction);
+        }
+    }
+
+    fn warn_instruction(&mut self, instruction: &Instruction) {
+        match &instruction.r#type {
+            InstructionType::None => {
+                ParseWarning::new(
+                    ParseWarningType::TrailingSemicolon,
+                    instruction.token.clone(),
+                    "Remove the extra semicolon",
+                )
+                .print();
+            }
+            InstructionType::StringLiteral(_) => {
+                ParseWarning::new(
+                    ParseWarningType::UnusedValue,
+                    instruction.token.clone(),
+                    "The result of this string literal is not used",
+                )
+                .print();
+            }
+            InstructionType::RegexLiteral(_) => {
+                ParseWarning::new(
+                    ParseWarningType::UnusedValue,
+                    instruction.token.clone(),
+                    "Remove the regex literal",
+                )
+                .print();
+            }
+            InstructionType::Addition(_, _) => {
+                ParseWarning::new(
+                    ParseWarningType::UnusedValue,
+                    instruction.token.clone(),
+                    "The result of this addition is not used",
+                )
+                .print();
+            }
+            InstructionType::Block(block) => {
+                for instruction in block {
+                    self.warn_instruction(&instruction);
+                }
+            }
+            InstructionType::Test(instruction, _, _) => self.warn_instruction(instruction),
+            InstructionType::For(instruction, _) => self.warn_instruction(instruction),
+            _ => (),
         }
     }
 }

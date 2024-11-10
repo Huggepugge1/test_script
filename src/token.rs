@@ -9,7 +9,10 @@ pub enum TokenType {
     CloseBlock,
     OpenParen,
     CloseParen,
+
     AssignmentOperator,
+    BinaryOperator,
+
     Semicolon,
 
     None,
@@ -27,7 +30,10 @@ impl std::fmt::Display for TokenType {
             TokenType::CloseBlock => write!(f, "CloseBlock"),
             TokenType::OpenParen => write!(f, "OpenParen"),
             TokenType::CloseParen => write!(f, "CloseParen"),
+
+            TokenType::BinaryOperator => write!(f, "operator"),
             TokenType::AssignmentOperator => write!(f, "Assignment operator"),
+
             TokenType::Semicolon => write!(f, "Semicolon"),
 
             TokenType::None => write!(f, ""),
@@ -53,8 +59,8 @@ impl Token {
         }
     }
 
-    pub fn operator(&self) -> bool {
-        false
+    pub fn binary_operator(&self) -> bool {
+        self.r#type == TokenType::BinaryOperator
     }
 }
 
@@ -123,6 +129,5 @@ impl TokenCollection {
                 break;
             }
         }
-        self.next();
     }
 }
