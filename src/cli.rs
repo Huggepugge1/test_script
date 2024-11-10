@@ -9,6 +9,9 @@ pub struct Args {
     #[clap(index = 1)]
     pub file: PathBuf,
 
+    #[clap(short = 'W', long)]
+    pub disable_warnings: bool,
+
     #[clap(short, long, default_value = "3")]
     pub max_size: u32,
 }

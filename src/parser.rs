@@ -1,3 +1,4 @@
+use crate::cli::Args;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
 use crate::regex;
@@ -8,16 +9,16 @@ use std::collections::HashSet;
 pub struct Parser {
     tokens: TokenCollection,
     variables: HashSet<String>,
-    max_size: u32,
+    args: Args,
     success: bool,
 }
 
 impl Parser {
-    pub fn new(tokens: TokenCollection, max_size: u32) -> Self {
+    pub fn new(tokens: TokenCollection, args: Args) -> Self {
         return Self {
             tokens,
             variables: HashSet::new(),
-            max_size,
+            args,
             success: true,
         };
     }
@@ -47,10 +48,13 @@ impl Parser {
             }
         }
 
-        self.warn(&program);
-
         match self.success {
-            true => Ok(program),
+            true => {
+                if !self.args.disable_warnings {
+                    self.warn(&program);
+                }
+                Ok(program)
+            }
 
             false => Err(ParseError::new(
                 ParseErrorType::TestError,
@@ -156,7 +160,7 @@ impl Parser {
             ))
         } else {
             Ok(Instruction::new(
-                InstructionType::RegexLiteral(regex::parse(&token, self.max_size)?),
+                InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
                 token,
             ))
         }

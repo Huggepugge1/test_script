@@ -3,9 +3,6 @@ test1("./input_test") {
         input(i + i);
         output(i + i);
     }
-    "string";
-    /thathoe/;
-    "iathoeu" + "attoeh";
     input("q");
     output("q");
 }
