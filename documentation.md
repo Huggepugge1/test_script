@@ -80,3 +80,6 @@ Concatenates the two strings a and b.
 `a + b`<br>
 #### Supported types
 `string` + `string`<br>
+
+## Comments
+Comments are written by `//`.
