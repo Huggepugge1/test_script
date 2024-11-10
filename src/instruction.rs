@@ -1,6 +1,7 @@
 use crate::error::{ParseError, ParseErrorType};
 use crate::r#type::Type;
 use crate::token::{Token, TokenType};
+use crate::variable::Variable;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltIn {
@@ -39,9 +40,11 @@ impl Instruction {
     }
 
     pub fn get_variable_name(&self) -> Result<String, ParseError> {
+        println!("{:?}", self);
         match &self.r#type {
-            InstructionType::IterableAssignment(var, _type, _instruction) => Ok(var.to_string()),
-            InstructionType::Variable(var) => Ok(var.to_string()),
+            InstructionType::IterableAssignment(var, _instruction) => Ok(var.name.clone()),
+            InstructionType::Assignment(var, _instruction) => Ok(var.name.clone()),
+            InstructionType::Variable(var) => Ok(var.name.clone()),
             _ => Err(ParseError::new(
                 ParseErrorType::VariableNotDefined,
                 self.token.clone(),
@@ -52,8 +55,9 @@ impl Instruction {
 
     pub fn get_variable_type(&self) -> Result<Type, ParseError> {
         match &self.r#type {
-            InstructionType::IterableAssignment(_var, r#type, _instruction) => Ok(r#type.clone()),
-            InstructionType::Assignment(_var, r#type, _instruction) => Ok(r#type.clone()),
+            InstructionType::IterableAssignment(var, _instruction) => Ok(var.r#type),
+            InstructionType::Assignment(var, _instruction) => Ok(var.r#type),
+            InstructionType::Variable(var) => Ok(var.r#type),
             _ => Err(ParseError::new(
                 ParseErrorType::VariableNotDefined,
                 self.token.clone(),
@@ -72,9 +76,9 @@ pub enum InstructionType {
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
 
-    Assignment(String, Type, Box<Instruction>),
-    IterableAssignment(String, Type, Box<Instruction>),
-    Variable(String),
+    Assignment(Variable, Box<Instruction>),
+    IterableAssignment(Variable, Box<Instruction>),
+    Variable(Variable),
 
     Addition(Box<Instruction>, Box<Instruction>),
 

@@ -5,6 +5,7 @@ use crate::instruction::{BuiltIn, Instruction, InstructionType};
 use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
+use crate::variable::Variable;
 
 pub struct Parser {
     tokens: TokenCollection,
@@ -144,6 +145,16 @@ impl Parser {
                 ),
                 token,
             )),
+            "=" => Ok(Instruction::new(
+                InstructionType::Assignment(
+                    Variable::new(
+                        last_instruction.get_variable_name().unwrap(),
+                        last_instruction.get_variable_type().unwrap(),
+                    ),
+                    Box::new(self.parse_expression()?),
+                ),
+                token,
+            )),
             _ => unreachable!(),
         }
     }
@@ -226,7 +237,10 @@ impl Parser {
             "=" => {
                 self.environment.insert(identifier.value.clone(), r#type);
                 Ok(Instruction::new(
-                    InstructionType::Assignment(identifier_name, r#type, Box::new(instruction)),
+                    InstructionType::Assignment(
+                        Variable::new(identifier_name, r#type),
+                        Box::new(instruction),
+                    ),
                     token,
                 ))
             }
@@ -234,8 +248,7 @@ impl Parser {
                 self.environment.insert(identifier.value.clone(), r#type);
                 Ok(Instruction::new(
                     InstructionType::IterableAssignment(
-                        identifier.value.clone(),
-                        r#type,
+                        Variable::new(identifier_name, r#type),
                         Box::new(instruction),
                     ),
                     token,
@@ -256,7 +269,10 @@ impl Parser {
             ))
         } else {
             Ok(Instruction::new(
-                InstructionType::Variable(token.value.clone()),
+                InstructionType::Variable(Variable::new(
+                    token.value.clone(),
+                    self.environment.get(&token.value).unwrap().clone(),
+                )),
                 token,
             ))
         }
@@ -453,7 +469,7 @@ impl Parser {
                     self.warn_instruction(&instruction);
                 }
             }
-            InstructionType::Assignment(_, _, instruction) => {
+            InstructionType::Assignment(_, instruction) => {
                 if !instruction.literal() {
                     self.warn_instruction(instruction)
                 }

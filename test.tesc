@@ -6,6 +6,9 @@ test1("./input_test") {
         print(i + ": ");
         println(i + i);
     }
+
+    digits = "a";
+    println(digits);
     input("q");
     output("q");
 }

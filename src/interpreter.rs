@@ -1,7 +1,7 @@
 use crate::environment::Environment;
 use crate::error::{InterpreterError, InterpreterErrorType};
 use crate::instruction::{BuiltIn, Instruction, InstructionType};
-use crate::r#type::Type;
+use crate::variable::Variable;
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::process::{Child, Command, Stdio};
@@ -161,12 +161,11 @@ impl Test {
 
     fn interpret_assignment(
         &mut self,
-        var: String,
-        _type: Type,
+        var: Variable,
         instruction: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
         let value = self.interpret_instruction(instruction)?;
-        self.environment.insert(var.clone(), value.clone());
+        self.environment.insert(var.name.clone(), value.clone());
         Ok(value)
     }
 
@@ -190,7 +189,7 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let mut result = InstructionResult::None;
         let (assignment_var, assignment_values) = match assignment.r#type {
-            InstructionType::IterableAssignment(var, _type, instruction) => {
+            InstructionType::IterableAssignment(var, instruction) => {
                 (var, self.interpret_instruction(*instruction)?)
             }
             _ => {
@@ -201,8 +200,10 @@ impl Test {
         match assignment_values {
             InstructionResult::Regex(values) => {
                 for value in values {
-                    self.environment
-                        .insert(assignment_var.clone(), InstructionResult::String(value));
+                    self.environment.insert(
+                        assignment_var.name.clone(),
+                        InstructionResult::String(value),
+                    );
                     result = self.interpret_instruction(instruction.clone())?;
                 }
             }
@@ -219,8 +220,8 @@ impl Test {
         Ok(result)
     }
 
-    fn interpret_variable(&self, var: String) -> Result<InstructionResult, InterpreterError> {
-        match self.environment.get(&var) {
+    fn interpret_variable(&self, var: Variable) -> Result<InstructionResult, InterpreterError> {
+        match self.environment.get(&var.name) {
             Some(value) => Ok(value.clone()),
             None => unreachable!(),
         }
@@ -242,8 +243,8 @@ impl Test {
                 self.interpret_for(*assignment, *instruction)?
             }
             InstructionType::Block(instructions) => self.interpret_block(instructions)?,
-            InstructionType::Assignment(var, r#type, instruction) => {
-                self.interpret_assignment(var, r#type, *instruction)?
+            InstructionType::Assignment(var, instruction) => {
+                self.interpret_assignment(var, *instruction)?
             }
 
             InstructionType::None => InstructionResult::None,

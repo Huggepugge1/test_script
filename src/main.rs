@@ -9,6 +9,7 @@ mod regex;
 mod test;
 mod token;
 mod r#type;
+mod variable;
 
 fn main() {
     cli::run();

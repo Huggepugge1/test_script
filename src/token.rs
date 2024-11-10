@@ -81,7 +81,7 @@ impl Token {
     }
 
     pub fn binary_operator(&self) -> bool {
-        self.r#type == TokenType::BinaryOperator
+        self.r#type == TokenType::BinaryOperator || self.r#type == TokenType::AssignmentOperator
     }
 }
 
