@@ -8,39 +8,59 @@ test_name("command") { ... }
 ```
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
-### Input and Output
+
+## Types
+There are two types, `string` and `regex`.
+
+## Input and Output
 The language is designed to test IO. There is two builtins that handle IO, `input` and `output`.
 
-#### Input
-Syntax: `input(string)`<br>
+### Input
 Sends the line string to the program being tested. Adds a new line at the end of the string. 
+#### Syntax
+`input(string)`<br>
 
-#### Output
-Syntax: `output(string)`<br>
+### Output
 Expect the next line of the programs Output to be string. Adds a new line at the end of the string.
+#### Syntax
+`output(string)`<br>
 
-### Builtins
-#### Print
-Syntax: `print(string)`<br>
+## Builtins
+### Print
 Print the string to the console. No extra newline.
+#### Syntax
+`print(string)`<br>
 
-#### Println
-Syntax: `println(string)`<br>
+### Println
 Print the string to the console. Adds a newline at the end of the string.
+#### Syntax
+`println(string)`<br>
 
 ## Loops
 The only loop available is the for loop.
 
 ### For
-Syntax: `for var_name in iterable { ... }`<br>
 For each element in the iterable, name it var_name and run the block.
+#### Syntax
+`for var_name in iterable { ... }`<br>
 
 ## Iterables
 The only iterable available is the regular expression (regex).
 
 ### Regex
-Syntax: `/regular expression/`<br>
 Creates an iterable containing all the different combinations that the Regex matches. Note: The star operation repeats `0-max_len` inclusive times. `max_len` is set by the command line argument `--max-len`.
+#### Syntax
+`/regular expression/`<br>
 
 #### Example
 /\d/ would create an iterable containg all digits 0-9.
+
+## Operators
+Tho only operators available are the `+`.
+
+### Plus
+Concatenates the two strings a and b.
+#### Syntax
+`a + b`<br>
+#### Supported types
+`string` + `string`<br>
