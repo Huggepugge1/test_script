@@ -9,7 +9,12 @@ test_name("command") { ... }
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
 ## Types
-There are two types, `string` and `regex`.
+There are three types, `string`, `regex` and `int`.
+
+### Type casting
+To cast a type to another, use the `as` keyword.
+#### Syntax
+`a as T`<br>
 
 ## Variables
 Variables are declared with the `let` keyword. They need to have a known type at compile time. At this time the only effect of the type is visual, as the language is not type checked yet.
@@ -80,6 +85,7 @@ Concatenates the two strings a and b.
 `a + b`<br>
 #### Supported types
 `string` + `string`<br>
+`int` + `int`<br>
 
 ## Comments
 Comments are written by `//`.
