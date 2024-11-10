@@ -1,5 +1,5 @@
 test_print("echo test") {
-	for i in /\d/ {
+	for i: string in /\d/ {
 		print(i);
 	}
 	println("");
