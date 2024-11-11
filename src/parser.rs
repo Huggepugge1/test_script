@@ -61,12 +61,12 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Instruction, ParseError> {
-        let instruction = self.parse_expression()?;
+        let instruction = self.parse_expression(true)?;
         self.end_statement()?;
         Ok(instruction)
     }
 
-    fn parse_expression(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_expression(&mut self, parse_binary: bool) -> Result<Instruction, ParseError> {
         let mut token = self.peek_next_token()?;
         let mut instruction = match token.r#type {
             TokenType::StringLiteral => self.parse_string_literal()?,
@@ -95,7 +95,10 @@ impl Parser {
         token = self.peek_next_token()?;
         while token.binary_operator() {
             instruction = match token.r#type {
-                TokenType::BinaryOperator => self.parse_operator(instruction)?,
+                TokenType::BinaryOperator => match parse_binary {
+                    true => self.parse_operator(instruction)?,
+                    false => break,
+                },
                 TokenType::TypeCast => self.parse_type_cast(instruction)?,
                 TokenType::AssignmentOperator => self.parse_assignment()?,
                 _ => unreachable!(),
@@ -148,17 +151,18 @@ impl Parser {
             "+" => BinaryOperator::Addition,
             "-" => BinaryOperator::Subtraction,
             "*" => BinaryOperator::Multiplication,
+            "/" => BinaryOperator::Division,
             _ => unreachable!(),
         };
 
-        let new_right = self.parse_expression()?;
-        match new_right.r#type {
+        let new_right = self.parse_expression(false)?;
+        match last_instruction.r#type {
             InstructionType::BinaryOperation {
                 ref operator,
                 ref left,
                 ref right,
             } => Ok(Instruction::new(
-                if new_operator < *operator {
+                if new_operator.cmp(&operator) != std::cmp::Ordering::Greater {
                     InstructionType::BinaryOperation {
                         operator: new_operator,
                         left: Box::new(last_instruction),
@@ -167,15 +171,15 @@ impl Parser {
                 } else {
                     InstructionType::BinaryOperation {
                         operator: operator.clone(),
-                        left: Box::new(Instruction::new(
+                        left: left.clone(),
+                        right: Box::new(Instruction::new(
                             InstructionType::BinaryOperation {
                                 operator: new_operator,
-                                left: Box::new(last_instruction),
-                                right: left.clone(),
+                                left: right.clone(),
+                                right: Box::new(new_right),
                             },
                             token.clone(),
                         )),
-                        right: right.clone(),
                     }
                 },
                 token,
@@ -316,7 +320,7 @@ impl Parser {
                 "A type should be followed by an assignment operator in an assingnment",
             ));
         }
-        let instruction = self.parse_expression()?;
+        let instruction = self.parse_expression(true)?;
         match assignment.value.as_str() {
             "=" => {
                 self.environment
@@ -372,7 +376,7 @@ impl Parser {
             TokenType::CloseParen => Ok(Instruction::NONE),
             _ => {
                 self.tokens.back();
-                self.parse_expression()
+                self.parse_expression(true)
             }
         }?;
 
@@ -459,7 +463,7 @@ impl Parser {
 
     fn parse_parentheses(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        let instruction = self.parse_expression()?;
+        let instruction = self.parse_expression(true)?;
         self.expect_token(TokenType::CloseParen)?;
         Ok(Instruction::new(
             InstructionType::Paren(Box::new(instruction)),
