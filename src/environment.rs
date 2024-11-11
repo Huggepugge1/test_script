@@ -1,11 +1,10 @@
 use crate::interpreter::InstructionResult;
-use crate::r#type::Type;
 use crate::variable::Variable;
 
 use std::collections::HashMap;
 
 pub struct ParseEnvironment {
-    pub variables: Vec<HashMap<String, Type>>,
+    pub variables: Vec<HashMap<String, Variable>>,
 }
 
 impl ParseEnvironment {
@@ -23,17 +22,17 @@ impl ParseEnvironment {
         self.variables.pop();
     }
 
-    pub fn insert(&mut self, var: Variable) {
+    pub fn insert(&mut self, variable: Variable) {
         self.variables
             .last_mut()
             .unwrap()
-            .insert(var.name, var.r#type);
+            .insert(variable.name.clone(), variable);
     }
 
-    pub fn get(&self, name: &str) -> Option<&Type> {
+    pub fn get(&self, name: &str) -> Option<&Variable> {
         for scope in self.variables.iter().rev() {
-            if let Some(r#type) = scope.get(name) {
-                return Some(r#type);
+            if let Some(variable) = scope.get(name) {
+                return Some(variable);
             }
         }
 

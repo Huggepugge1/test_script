@@ -27,6 +27,7 @@ pub enum ParseErrorType {
     RegexError,
 
     VariableNotDefined,
+    VariableIsConstant,
 
     TestError,
 
@@ -69,7 +70,9 @@ impl std::fmt::Display for ParseErrorType {
             }
 
             ParseErrorType::RegexError => write!(f, "Regex error"),
+
             ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
+            ParseErrorType::VariableIsConstant => write!(f, "Variable is constant"),
 
             ParseErrorType::TestError => write!(f, "Test error"),
 

@@ -17,10 +17,14 @@ To cast a type to another, use the `as` keyword.
 `a as T`<br>
 
 ## Variables
-Variables are declared with the `let` keyword. They need to have a known type at compile time. At this time the only effect of the type is visual, as the language is not type checked yet.
+Variables are declared with the `let` keyword.
+Constants are declared with the `const` keyword.
+A constant cannot be reassigned.
+All variables must be declared with a type.
 
 ### Example
-`let a: string = "Hello, World!"`;
+`let a: string = "Hello, World!";`<br>
+`const b: int = 42;`<br>
 
 ## Blocks
 Blocks are defined by curly braces `{ ... }`.
@@ -74,7 +78,7 @@ Note: The star operation repeats `0-max_len` inclusive times.
 `\`\\d\`` would create an iterable containg all digits 0-9.
 
 ## Operators
-There are 5, `=`, `+`, `-`, `*` and `/`.
+There are 4 operators, `+`, `-`, `*` and `/`.
 
 ### Assignment
 Assigns the value of b to a. The let keyword is not needed when assigning a value to a variable that has not yet been defined.
