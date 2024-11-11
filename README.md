@@ -4,7 +4,7 @@ A language to write io test for your program.
 ## Installation
 ```bash
 curl -s --compressed "https://huggepugge1.github.io/apt/KEY.gpg" | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/apt.gpg >/dev/null
-sudo curl -s --compressed -o /etc/apt/sources.list.d/my_list_file.list "https://huggepugge1.github.io/apt/my_list_file.list"
+sudo curl -s --compressed -o /etc/apt/sources.list.d/huggepugge1.list "https://huggepugge1.github.io/apt/huggepugge1.list"
 sudo apt update
 sudo apt install test-script
 ```
