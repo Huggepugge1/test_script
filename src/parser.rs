@@ -61,21 +61,26 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Instruction, ParseError> {
-        let instruction = self.parse_expression()?;
+        let instruction = self.parse_expression(true)?;
         self.end_statement()?;
         Ok(instruction)
     }
 
-    fn parse_expression(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_expression(&mut self, parse_binary: bool) -> Result<Instruction, ParseError> {
         let mut token = self.peek_next_token()?;
         let mut instruction = match token.r#type {
             TokenType::StringLiteral => self.parse_string_literal()?,
             TokenType::RegexLiteral => self.parse_regex_literal()?,
             TokenType::IntegerLiteral => self.parse_integer_literal()?,
+
             TokenType::Keyword => self.parse_keyword()?,
             TokenType::BuiltIn => self.parse_builtin()?,
+
             TokenType::Identifier => self.parse_identifier()?,
+
             TokenType::OpenBlock => self.parse_block()?,
+            TokenType::OpenParen => self.parse_parentheses()?,
+
             TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
             _ => {
                 self.tokens.advance_to_next_instruction();
@@ -89,7 +94,15 @@ impl Parser {
 
         token = self.peek_next_token()?;
         while token.binary_operator() {
-            instruction = self.parse_operator(instruction)?;
+            instruction = match token.r#type {
+                TokenType::BinaryOperator => match parse_binary {
+                    true => self.parse_operator(instruction)?,
+                    false => break,
+                },
+                TokenType::TypeCast => self.parse_type_cast(instruction)?,
+                TokenType::AssignmentOperator => self.parse_assignment()?,
+                _ => unreachable!(),
+            };
             token = self.peek_next_token()?;
         }
 
@@ -133,27 +146,51 @@ impl Parser {
 
     fn parse_operator(&mut self, last_instruction: Instruction) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        match token.value.as_str() {
-            "+" => Ok(Instruction::new(
-                InstructionType::BinaryOperation {
-                    operator: BinaryOperator::Addition,
-                    left: Box::new(last_instruction),
-                    right: Box::new(self.parse_expression()?),
+        let new_operator = match token.value.as_str() {
+            "+" => BinaryOperator::Addition,
+            "-" => BinaryOperator::Subtraction,
+            "*" => BinaryOperator::Multiplication,
+            "/" => BinaryOperator::Division,
+            _ => unreachable!(),
+        };
+
+        let new_right = self.parse_expression(false)?;
+        match last_instruction.r#type {
+            InstructionType::BinaryOperation {
+                ref operator,
+                ref left,
+                ref right,
+            } => Ok(Instruction::new(
+                if new_operator.cmp(&operator) != std::cmp::Ordering::Greater {
+                    InstructionType::BinaryOperation {
+                        operator: new_operator,
+                        left: Box::new(last_instruction),
+                        right: Box::new(new_right),
+                    }
+                } else {
+                    InstructionType::BinaryOperation {
+                        operator: operator.clone(),
+                        left: left.clone(),
+                        right: Box::new(Instruction::new(
+                            InstructionType::BinaryOperation {
+                                operator: new_operator,
+                                left: right.clone(),
+                                right: Box::new(new_right),
+                            },
+                            token.clone(),
+                        )),
+                    }
                 },
                 token,
             )),
-            "as" => self.parse_type_cast(last_instruction),
-            "=" => Ok(Instruction::new(
-                InstructionType::Assignment(
-                    Variable::new(
-                        last_instruction.get_variable_name().unwrap(),
-                        last_instruction.get_variable_type().unwrap(),
-                    ),
-                    Box::new(self.parse_expression()?),
-                ),
+            _ => Ok(Instruction::new(
+                InstructionType::BinaryOperation {
+                    operator: new_operator,
+                    left: Box::new(last_instruction),
+                    right: Box::new(new_right),
+                },
                 token,
             )),
-            _ => unreachable!(),
         }
     }
 
@@ -162,7 +199,7 @@ impl Parser {
         last_instruction: Instruction,
     ) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        let r#type = match token {
+        let r#type = match self.get_next_token()? {
             Token {
                 r#type: TokenType::Type,
                 ref value,
@@ -282,7 +319,7 @@ impl Parser {
                 "A type should be followed by an assignment operator in an assingnment",
             ));
         }
-        let instruction = self.parse_expression()?;
+        let instruction = self.parse_expression(true)?;
         match assignment.value.as_str() {
             "=" => {
                 self.environment
@@ -338,7 +375,7 @@ impl Parser {
             TokenType::CloseParen => Ok(Instruction::NONE),
             _ => {
                 self.tokens.back();
-                self.parse_expression()
+                self.parse_expression(true)
             }
         }?;
 
@@ -421,6 +458,16 @@ impl Parser {
             )),
             Err(_) => Err(ParseError::none()),
         }
+    }
+
+    fn parse_parentheses(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let instruction = self.parse_expression(true)?;
+        self.expect_token(TokenType::CloseParen)?;
+        Ok(Instruction::new(
+            InstructionType::Paren(Box::new(instruction)),
+            token,
+        ))
     }
 
     fn expect_token(&mut self, expected: TokenType) -> Result<(), ParseError> {

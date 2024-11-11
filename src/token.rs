@@ -14,9 +14,11 @@ pub enum TokenType {
 
     OpenBlock,
     CloseBlock,
+
     OpenParen,
     CloseParen,
 
+    TypeCast,
     AssignmentOperator,
     BinaryOperator,
 
@@ -45,8 +47,9 @@ impl std::fmt::Display for TokenType {
             TokenType::OpenParen => write!(f, "OpenParen"),
             TokenType::CloseParen => write!(f, "CloseParen"),
 
-            TokenType::BinaryOperator => write!(f, "operator"),
+            TokenType::TypeCast => write!(f, "Type cast"),
             TokenType::AssignmentOperator => write!(f, "Assignment operator"),
+            TokenType::BinaryOperator => write!(f, "operator"),
 
             TokenType::Semicolon => write!(f, "Semicolon"),
 
@@ -83,7 +86,9 @@ impl Token {
     }
 
     pub fn binary_operator(&self) -> bool {
-        self.r#type == TokenType::BinaryOperator || self.r#type == TokenType::AssignmentOperator
+        self.r#type == TokenType::BinaryOperator
+            || self.r#type == TokenType::AssignmentOperator
+            || self.r#type == TokenType::TypeCast
     }
 }
 

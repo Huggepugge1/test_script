@@ -64,15 +64,17 @@ For each element in the iterable, name it var_name and run the next statement.
 The only iterable available is the regular expression (regex).
 
 ### Regex
-Creates an iterable containing all the different combinations that the Regex matches. Note: The star operation repeats `0-max_len` inclusive times. `max_len` is set by the command line argument `--max-len`.
+Creates an iterable containing all the different combinations that the Regex matches.
+Note: The star operation repeats `0-max_len` inclusive times.
+`max_len` is set by the command line argument `--max-len`.
 #### Syntax
-`/regular expression/`<br>
+`\`regular expression\``<br>
 
 #### Example
-/\d/ would create an iterable containg all digits 0-9.
+`\`\\d\`` would create an iterable containg all digits 0-9.
 
 ## Operators
-There are only two operators, `=` and `+`.
+There are 5, `=`, `+`, `-`, `*` and `/`.
 
 ### Assignment
 Assigns the value of b to a. The let keyword is not needed when assigning a value to a variable that has not yet been defined.
@@ -86,6 +88,28 @@ Concatenates the two strings a and b.
 #### Supported types
 `string` + `string`<br>
 `int` + `int`<br>
+
+### Minus
+Subtracts b from a.
+#### Syntax
+`a - b`<br>
+#### Supported types
+`int` - `int`<br>
+
+### Multiply
+Multiplies a and b.
+#### Syntax
+`a * b`<br>
+#### Supported types
+`int` * `int`<br>
+`string` * `int`<br>
+
+### Divide
+Divides a by b.
+#### Syntax
+`a / b`<br>
+#### Supported types
+`int` / `int`<br>
 
 ## Comments
 Comments are written by `//`.

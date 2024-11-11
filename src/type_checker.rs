@@ -62,6 +62,8 @@ impl TypeChecker {
                 Ok(result)
             }
 
+            InstructionType::Paren(instruction) => self.check_instruction(instruction),
+
             InstructionType::For(assignment, statement) => {
                 self.environment.add_scope();
                 self.check_instruction(&assignment)?;
@@ -238,6 +240,9 @@ impl TypeChecker {
     ) -> Result<Type, ParseError> {
         match operator {
             BinaryOperator::Addition => self.check_addition(left, right, token),
+            BinaryOperator::Subtraction => self.check_subtraction(left, right, token),
+            BinaryOperator::Multiplication => self.check_multiplication(left, right, token),
+            BinaryOperator::Division => self.check_division(left, right, token),
         }
     }
 
@@ -255,13 +260,94 @@ impl TypeChecker {
             (Type::Int, Type::Int) => Ok(Type::Int),
             (t1, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedTypeBinary {
-                    expected_left: Type::String,
+                    expected_left: t1,
                     actual_left: t1,
-                    expected_right: Type::String,
+                    expected_right: t1,
                     actual_right: t2,
                 },
                 token.clone(),
                 format!("Addition is not supported between `{}` and `{}`", t1, t2),
+            )),
+        }
+    }
+
+    fn check_subtraction(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+        token: &Token,
+    ) -> Result<Type, ParseError> {
+        let left = self.check_instruction(left)?;
+        let right = self.check_instruction(right)?;
+
+        match (left, right) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (t1, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedTypeBinary {
+                    expected_left: Type::Int,
+                    actual_left: t1,
+                    expected_right: Type::Int,
+                    actual_right: t2,
+                },
+                token.clone(),
+                format!("Subtraction is not supported between `{}` and `{}`", t1, t2),
+            )),
+        }
+    }
+
+    fn check_multiplication(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+        token: &Token,
+    ) -> Result<Type, ParseError> {
+        let left = self.check_instruction(left)?;
+        let right = self.check_instruction(right)?;
+
+        match (left, right) {
+            (Type::String, Type::Int) => Ok(Type::String),
+            (Type::Int, Type::Int) => Ok(Type::Int),
+
+            (t1, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedTypeBinary {
+                    expected_left: Type::Int,
+                    actual_left: t1,
+                    expected_right: Type::Int,
+                    actual_right: t2,
+                },
+                token.clone(),
+                format!(
+                    "Multiplication is not supported between `{}` and `{}`",
+                    t1, t2
+                ),
+            )),
+        }
+    }
+
+    fn check_division(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+        token: &Token,
+    ) -> Result<Type, ParseError> {
+        let left = self.check_instruction(left)?;
+        let right = self.check_instruction(right)?;
+
+        match (left, right) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+
+            (t1, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedTypeBinary {
+                    expected_left: Type::Int,
+                    actual_left: t1,
+                    expected_right: Type::Int,
+                    actual_right: t2,
+                },
+                token.clone(),
+                format!(
+                    "Multiplication is not supported between `{}` and `{}`",
+                    t1, t2
+                ),
             )),
         }
     }

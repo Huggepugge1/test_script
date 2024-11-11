@@ -3,9 +3,32 @@ use crate::r#type::Type;
 use crate::token::{Token, TokenType};
 use crate::variable::Variable;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
 pub enum BinaryOperator {
     Addition,
+    Subtraction,
+    Multiplication,
+    Division,
+}
+
+impl BinaryOperator {
+    const ADDITION: BinaryOperator = BinaryOperator::Addition;
+    const MULTIPLICATION: BinaryOperator = BinaryOperator::Multiplication;
+
+    pub fn value(&self) -> Self {
+        match self {
+            BinaryOperator::Addition => Self::ADDITION,
+            BinaryOperator::Subtraction => Self::ADDITION,
+            BinaryOperator::Multiplication => Self::MULTIPLICATION,
+            BinaryOperator::Division => Self::MULTIPLICATION,
+        }
+    }
+}
+
+impl std::cmp::Ord for BinaryOperator {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value().partial_cmp(&other.value()).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +96,8 @@ pub enum InstructionType {
     BuiltIn(BuiltIn),
 
     Block(Vec<Instruction>),
+    Paren(Box<Instruction>),
+
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
 

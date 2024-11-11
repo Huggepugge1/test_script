@@ -17,7 +17,7 @@ impl<'a> Lexer<'a> {
             "for" | "let" => TokenType::Keyword,
             "string" | "regex" | "int" => TokenType::Type,
             "in" => TokenType::AssignmentOperator,
-            "as" => TokenType::BinaryOperator,
+            "as" => TokenType::TypeCast,
             "input" | "output" | "print" | "println" => TokenType::BuiltIn,
             _ => TokenType::Identifier,
         }
@@ -123,6 +123,24 @@ impl<'a> Lexer<'a> {
                     line,
                     column,
                 )),
+                '-' => tokens.push(Token::new(
+                    TokenType::BinaryOperator,
+                    &"-".to_string(),
+                    line,
+                    column,
+                )),
+                '*' => tokens.push(Token::new(
+                    TokenType::BinaryOperator,
+                    &"*".to_string(),
+                    line,
+                    column,
+                )),
+                '/' => tokens.push(Token::new(
+                    TokenType::BinaryOperator,
+                    &"/".to_string(),
+                    line,
+                    column,
+                )),
                 ':' => tokens.push(Token::new(TokenType::Colon, &":".to_string(), line, column)),
                 '=' => tokens.push(Token::new(
                     TokenType::AssignmentOperator,
@@ -153,9 +171,9 @@ impl<'a> Lexer<'a> {
                     ));
                     continue;
                 }
-                '/' => {
+                '`' => {
                     self.contents.next();
-                    if self.contents.peek() == Some(&'/') {
+                    if self.contents.peek() == Some(&'`') {
                         while let Some(next) = self.contents.next() {
                             if next == '\n' {
                                 line += 1;
