@@ -103,7 +103,6 @@ impl Parser {
                 TokenType::AssignmentOperator => self.parse_assignment()?,
                 _ => unreachable!(),
             };
-            println!("{:#?}", instruction);
             token = self.peek_next_token()?;
         }
 
