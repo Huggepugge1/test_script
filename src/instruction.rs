@@ -1,4 +1,3 @@
-use crate::error::{ParseError, ParseErrorType};
 use crate::r#type::Type;
 use crate::token::{Token, TokenType};
 use crate::variable::Variable;
@@ -58,38 +57,6 @@ impl Instruction {
 
     pub fn new(r#type: InstructionType, token: Token) -> Self {
         Self { r#type, token }
-    }
-
-    pub fn get_variable_name(&self) -> Result<String, ParseError> {
-        match &self.r#type {
-            InstructionType::IterableAssignment(var, _instruction) => Ok(var.name.clone()),
-            InstructionType::Assignment {
-                variable,
-                instruction: _,
-            } => Ok(variable.name.clone()),
-            InstructionType::Variable(variable) => Ok(variable.name.clone()),
-            _ => Err(ParseError::new(
-                ParseErrorType::VariableNotDefined,
-                self.token.clone(),
-                "Expected a variable",
-            )),
-        }
-    }
-
-    pub fn get_variable_type(&self) -> Result<Type, ParseError> {
-        match &self.r#type {
-            InstructionType::IterableAssignment(var, _instruction) => Ok(var.r#type),
-            InstructionType::Assignment {
-                variable,
-                instruction: _,
-            } => Ok(variable.r#type),
-            InstructionType::Variable(var) => Ok(var.r#type),
-            _ => Err(ParseError::new(
-                ParseErrorType::VariableNotDefined,
-                self.token.clone(),
-                "Expected a variable",
-            )),
-        }
     }
 }
 
