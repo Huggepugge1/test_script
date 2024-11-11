@@ -14,7 +14,7 @@ impl<'a> Lexer<'a> {
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
-            "for" | "let" => TokenType::Keyword,
+            "for" | "let" | "const" => TokenType::Keyword,
             "string" | "regex" | "int" => TokenType::Type,
             "in" => TokenType::AssignmentOperator,
             "as" => TokenType::TypeCast,
@@ -62,6 +62,7 @@ impl<'a> Lexer<'a> {
     pub fn tokenize_regex_literal(&mut self, line: &mut u32, column: &mut u32) -> Token {
         let start_line = line.clone();
         let start_column = column.clone();
+        self.contents.next();
 
         let mut current = String::new();
         while let Some(next) = self.contents.next() {
@@ -69,7 +70,7 @@ impl<'a> Lexer<'a> {
                 *line += 1;
                 *column = 1;
             }
-            if next == '/' {
+            if next == '`' {
                 break;
             }
             current.push(next);
@@ -135,12 +136,23 @@ impl<'a> Lexer<'a> {
                     line,
                     column,
                 )),
-                '/' => tokens.push(Token::new(
-                    TokenType::BinaryOperator,
-                    &"/".to_string(),
-                    line,
-                    column,
-                )),
+                '/' => {
+                    if let Some('/') = self.contents.peek() {
+                        while let Some(next) = self.contents.next() {
+                            if next == '\n' {
+                                break;
+                            }
+                            column += 1;
+                        }
+                    } else {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"/".to_string(),
+                            line,
+                            column,
+                        ))
+                    }
+                }
                 ':' => tokens.push(Token::new(TokenType::Colon, &":".to_string(), line, column)),
                 '=' => tokens.push(Token::new(
                     TokenType::AssignmentOperator,
@@ -172,20 +184,7 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 '`' => {
-                    self.contents.next();
-                    if self.contents.peek() == Some(&'`') {
-                        while let Some(next) = self.contents.next() {
-                            if next == '\n' {
-                                line += 1;
-                                column = 1;
-                                break;
-                            }
-                            column += 1;
-                        }
-                        continue;
-                    } else {
-                        tokens.push(self.tokenize_regex_literal(&mut line, &mut column));
-                    }
+                    tokens.push(self.tokenize_regex_literal(&mut line, &mut column));
                     continue;
                 }
                 '"' => {

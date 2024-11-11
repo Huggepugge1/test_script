@@ -100,7 +100,7 @@ impl Parser {
                     false => break,
                 },
                 TokenType::TypeCast => self.parse_type_cast(instruction)?,
-                TokenType::AssignmentOperator => self.parse_assignment()?,
+                TokenType::AssignmentOperator => self.parse_assignment(instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -264,7 +264,8 @@ impl Parser {
     fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
         let token = self.peek_next_token()?;
         match token.value.as_str() {
-            "let" => self.parse_assignment(),
+            "let" => self.parse_declaration(),
+            "const" => self.parse_declaration(),
             "for" => self.parse_for(),
             "in" => {
                 self.tokens.advance_to_next_instruction();
@@ -278,7 +279,7 @@ impl Parser {
         }
     }
 
-    fn parse_assignment(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_declaration(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let identifier = self.get_next_token()?;
         let identifier_name = identifier.value.clone();
@@ -320,31 +321,88 @@ impl Parser {
             ));
         }
         let instruction = self.parse_expression(true)?;
+        let variable = Variable::new(
+            identifier_name.clone(),
+            token.value == "const",
+            r#type.clone(),
+        );
         match assignment.value.as_str() {
             "=" => {
-                self.environment
-                    .insert(Variable::new(identifier_name.clone(), r#type.clone()));
+                self.environment.insert(variable.clone());
                 Ok(Instruction::new(
-                    InstructionType::Assignment(
-                        Variable::new(identifier_name, r#type),
-                        Box::new(instruction),
-                    ),
+                    InstructionType::Assignment {
+                        variable,
+                        instruction: Box::new(instruction),
+                    },
                     token,
                 ))
             }
             "in" => {
-                self.environment
-                    .insert(Variable::new(identifier_name.clone(), r#type.clone()));
+                self.environment.insert(variable.clone());
                 Ok(Instruction::new(
-                    InstructionType::IterableAssignment(
-                        Variable::new(identifier_name, r#type),
-                        Box::new(instruction),
-                    ),
+                    InstructionType::IterableAssignment(variable, Box::new(instruction)),
                     token,
                 ))
             }
             _ => unreachable!(),
         }
+    }
+
+    fn parse_assignment(&mut self, instruction: Instruction) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let variable = match instruction.r#type {
+            InstructionType::Variable(variable) => variable,
+            _ => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken,
+                    token.clone(),
+                    "An asignment operator should always be preceded by a variable",
+                ));
+            }
+        };
+
+        if variable.r#const {
+            self.tokens.advance_to_next_instruction();
+            return Err(ParseError::new(
+                ParseErrorType::VariableIsConstant,
+                instruction.token.clone(),
+                format!(
+                    "Variable \"{}\" is a constant and cannot be reassigned",
+                    variable.name
+                ),
+            ));
+        }
+
+        if token.r#type != TokenType::AssignmentOperator {
+            self.tokens.advance_to_next_instruction();
+            return Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType(
+                    TokenType::AssignmentOperator,
+                    token.r#type.clone(),
+                ),
+                token,
+                "An identifier should always be followed by an assignment operator in an assignment",
+            ));
+        }
+
+        let instruction = self.parse_expression(true)?;
+        if self.environment.get(&variable.name).is_none() {
+            self.tokens.advance_to_next_instruction();
+            return Err(ParseError::new(
+                ParseErrorType::VariableNotDefined,
+                token.clone(),
+                format!("Variable \"{}\" is not defined", variable.name),
+            ));
+        }
+
+        Ok(Instruction::new(
+            InstructionType::Assignment {
+                variable,
+                instruction: Box::new(instruction),
+            },
+            token,
+        ))
     }
 
     fn parse_identifier(&mut self) -> Result<Instruction, ParseError> {
@@ -358,10 +416,7 @@ impl Parser {
             ))
         } else {
             Ok(Instruction::new(
-                InstructionType::Variable(Variable::new(
-                    token.value.clone(),
-                    self.environment.get(&token.value).unwrap().clone(),
-                )),
+                InstructionType::Variable(self.environment.get(&token.value).unwrap().clone()),
                 token,
             ))
         }
@@ -426,22 +481,11 @@ impl Parser {
 
         self.environment.add_scope();
 
-        let assignment = self.parse_assignment();
-        match assignment {
-            Ok(ref assignment) => {
-                let name = assignment.get_variable_name().unwrap();
-                let r#type = assignment.get_variable_type().unwrap();
-                self.environment.insert(Variable::new(name, r#type));
-            }
-
-            Err(ref e) => {
-                e.print();
-                self.success = false;
-            }
-        }
+        let assignment = self.parse_declaration();
 
         let statement = self.parse_statement();
         self.environment.remove_scope();
+
         let statement = match statement {
             Ok(statement) => statement,
             Err(e) => {

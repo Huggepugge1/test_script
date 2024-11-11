@@ -77,9 +77,10 @@ impl TypeChecker {
                 Ok(variable.r#type)
             }
 
-            InstructionType::Assignment(variable, instruction) => {
-                self.check_assignment(&variable, &instruction)
-            }
+            InstructionType::Assignment {
+                variable,
+                instruction,
+            } => self.check_assignment(&variable, &instruction),
 
             InstructionType::IterableAssignment(variable, instruction) => {
                 self.check_iterable_assignment(&variable, &instruction)

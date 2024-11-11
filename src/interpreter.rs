@@ -331,9 +331,10 @@ impl Test {
             InstructionType::For(assignment, instruction) => {
                 self.interpret_for(*assignment, *instruction)?
             }
-            InstructionType::Assignment(var, instruction) => {
-                self.interpret_assignment(var, *instruction)?
-            }
+            InstructionType::Assignment {
+                variable,
+                instruction,
+            } => self.interpret_assignment(variable, *instruction)?,
             InstructionType::Variable(var) => self.interpret_variable(var)?,
 
             InstructionType::None => InstructionResult::None,
