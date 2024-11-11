@@ -1,9 +1,20 @@
 [package]
-name = "test_script"
-version = "0.1.1"
+name = "test-script"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
 itertools = "0.13.0"
 regex-syntax = "0.8.5"
+
+[package.metadata.deb]
+copyright = "2024, Hugo Lindström <huggepugge1@gmail.com>"
+maintainer = "Hugo Lindström <huggepugge1@gmail.com>"
+extended-description = """Testing programming language for IO"""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+ ["target/release/test-script", "usr/bin/", "755"],
+]
