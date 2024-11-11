@@ -114,6 +114,8 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         match operator {
             BinaryOperator::Addition => self.interpret_addition(left, right),
+            BinaryOperator::Subtraction => self.interpret_subtraction(left, right),
+            BinaryOperator::Multiplication => self.interpret_multiplication(left, right),
         }
     }
 
@@ -130,6 +132,43 @@ impl Test {
             }
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Integer(left + right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_subtraction(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Integer(left - right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_multiplication(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Integer(left * right))
+            }
+            (InstructionResult::String(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::String(left.repeat(right as usize)))
             }
             _ => {
                 unreachable!()
@@ -269,6 +308,8 @@ impl Test {
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
 
             InstructionType::Block(instructions) => self.interpret_block(instructions)?,
+            InstructionType::Paren(instruction) => self.interpret_instruction(*instruction)?,
+
             InstructionType::For(assignment, instruction) => {
                 self.interpret_for(*assignment, *instruction)?
             }

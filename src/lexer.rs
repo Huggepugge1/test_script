@@ -17,7 +17,7 @@ impl<'a> Lexer<'a> {
             "for" | "let" => TokenType::Keyword,
             "string" | "regex" | "int" => TokenType::Type,
             "in" => TokenType::AssignmentOperator,
-            "as" => TokenType::BinaryOperator,
+            "as" => TokenType::TypeCast,
             "input" | "output" | "print" | "println" => TokenType::BuiltIn,
             _ => TokenType::Identifier,
         }
@@ -120,6 +120,18 @@ impl<'a> Lexer<'a> {
                 '+' => tokens.push(Token::new(
                     TokenType::BinaryOperator,
                     &"+".to_string(),
+                    line,
+                    column,
+                )),
+                '-' => tokens.push(Token::new(
+                    TokenType::BinaryOperator,
+                    &"-".to_string(),
+                    line,
+                    column,
+                )),
+                '*' => tokens.push(Token::new(
+                    TokenType::BinaryOperator,
+                    &"*".to_string(),
                     line,
                     column,
                 )),

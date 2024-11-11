@@ -3,9 +3,11 @@ use crate::r#type::Type;
 use crate::token::{Token, TokenType};
 use crate::variable::Variable;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum BinaryOperator {
     Addition,
+    Subtraction,
+    Multiplication,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +75,8 @@ pub enum InstructionType {
     BuiltIn(BuiltIn),
 
     Block(Vec<Instruction>),
+    Paren(Box<Instruction>),
+
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
 
