@@ -9,6 +9,9 @@ test1("./input_test") {
     a = a + "1";
     println(a);
 
+    const b: int = 1;
+    println(b as string);
+
     let s: string = "123";
     s = s + "456";
     println(s);

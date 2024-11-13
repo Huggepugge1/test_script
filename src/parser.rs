@@ -96,11 +96,11 @@ impl Parser {
         while token.binary_operator() {
             instruction = match token.r#type {
                 TokenType::BinaryOperator => match parse_binary {
-                    true => self.parse_operator(instruction)?,
+                    true => self.parse_operator(&instruction)?,
                     false => break,
                 },
-                TokenType::TypeCast => self.parse_type_cast(instruction)?,
-                TokenType::AssignmentOperator => self.parse_assignment(instruction)?,
+                TokenType::TypeCast => self.parse_type_cast(&instruction)?,
+                TokenType::AssignmentOperator => self.parse_assignment(&instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -144,7 +144,7 @@ impl Parser {
         }
     }
 
-    fn parse_operator(&mut self, last_instruction: Instruction) -> Result<Instruction, ParseError> {
+    fn parse_operator(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let new_operator = match token.value.as_str() {
             "+" => BinaryOperator::Addition,
@@ -155,7 +155,7 @@ impl Parser {
         };
 
         let new_right = self.parse_expression(false)?;
-        match last_instruction.r#type {
+        match instruction.r#type {
             InstructionType::BinaryOperation {
                 ref operator,
                 ref left,
@@ -164,7 +164,7 @@ impl Parser {
                 if new_operator.cmp(&operator) != std::cmp::Ordering::Greater {
                     InstructionType::BinaryOperation {
                         operator: new_operator,
-                        left: Box::new(last_instruction),
+                        left: Box::new(instruction.clone()),
                         right: Box::new(new_right),
                     }
                 } else {
@@ -186,7 +186,7 @@ impl Parser {
             _ => Ok(Instruction::new(
                 InstructionType::BinaryOperation {
                     operator: new_operator,
-                    left: Box::new(last_instruction),
+                    left: Box::new(instruction.clone()),
                     right: Box::new(new_right),
                 },
                 token,
@@ -194,10 +194,7 @@ impl Parser {
         }
     }
 
-    fn parse_type_cast(
-        &mut self,
-        last_instruction: Instruction,
-    ) -> Result<Instruction, ParseError> {
+    fn parse_type_cast(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let r#type = match self.get_next_token()? {
             Token {
@@ -216,7 +213,7 @@ impl Parser {
         };
         Ok(Instruction::new(
             InstructionType::TypeCast {
-                instruction: Box::new(last_instruction),
+                instruction: Box::new(instruction.clone()),
                 r#type,
             },
             token,
@@ -348,9 +345,9 @@ impl Parser {
         }
     }
 
-    fn parse_assignment(&mut self, instruction: Instruction) -> Result<Instruction, ParseError> {
+    fn parse_assignment(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        let variable = match instruction.r#type {
+        let variable = match &instruction.r#type {
             InstructionType::Variable(variable) => variable,
             _ => {
                 self.tokens.advance_to_next_instruction();
@@ -398,7 +395,7 @@ impl Parser {
 
         Ok(Instruction::new(
             InstructionType::Assignment {
-                variable,
+                variable: variable.clone(),
                 instruction: Box::new(instruction),
             },
             token,
