@@ -3,6 +3,7 @@ pub enum Type {
     String,
     Regex,
     Int,
+    Bool,
     None,
 
     Iterable,
@@ -14,6 +15,7 @@ impl Type {
             "string" => Type::String,
             "regex" => Type::Regex,
             "int" => Type::Int,
+            "bool" => Type::Bool,
             _ => panic!("Invalid type"),
         }
     }
@@ -25,6 +27,7 @@ impl std::fmt::Display for Type {
             Type::String => write!(f, "String"),
             Type::Regex => write!(f, "Regex"),
             Type::Int => write!(f, "Int"),
+            Type::Bool => write!(f, "Bool"),
             Type::None => write!(f, "()"),
 
             Type::Iterable => write!(f, "Iterable"),

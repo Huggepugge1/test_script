@@ -1,7 +1,7 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
-use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
 use crate::token::Token;
 use crate::variable::Variable;
@@ -49,6 +49,7 @@ impl TypeChecker {
             InstructionType::StringLiteral(_) => Ok(Type::String),
             InstructionType::RegexLiteral(_) => Ok(Type::Regex),
             InstructionType::IntegerLiteral(_) => Ok(Type::Int),
+            InstructionType::BooleanLiteral(_) => Ok(Type::Bool),
 
             InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
 
@@ -63,6 +64,12 @@ impl TypeChecker {
             }
 
             InstructionType::Paren(instruction) => self.check_instruction(instruction),
+
+            InstructionType::Conditional {
+                condition,
+                instruction,
+                r#else,
+            } => self.check_conditional(condition, instruction, r#else),
 
             InstructionType::For(assignment, statement) => {
                 self.environment.add_scope();
@@ -86,6 +93,10 @@ impl TypeChecker {
                 self.check_iterable_assignment(&variable, &instruction)
             }
 
+            InstructionType::UnaryOperation {
+                operator,
+                instruction,
+            } => self.check_unary(operator, &instruction),
             InstructionType::BinaryOperation {
                 operator,
                 left,
@@ -232,6 +243,38 @@ impl TypeChecker {
         }
     }
 
+    fn check_unary(
+        &mut self,
+        operator: &UnaryOperator,
+        instruction: &Instruction,
+    ) -> Result<Type, ParseError> {
+        let instruction_type = self.check_instruction(instruction)?;
+        match operator {
+            UnaryOperator::Not => match instruction_type {
+                Type::Bool => Ok(Type::Bool),
+                t => Err(ParseError::new(
+                    ParseErrorType::MismatchedType {
+                        expected: Type::Bool,
+                        actual: t,
+                    },
+                    instruction.token.clone(),
+                    format!("Expected a boolean but found a {t:?}"),
+                )),
+            },
+            UnaryOperator::Negation => match instruction_type {
+                Type::Int => Ok(Type::Int),
+                t => Err(ParseError::new(
+                    ParseErrorType::MismatchedType {
+                        expected: Type::Int,
+                        actual: t,
+                    },
+                    instruction.token.clone(),
+                    format!("Expected an integer but found a {t:?}"),
+                )),
+            },
+        }
+    }
+
     fn check_binary(
         &mut self,
         operator: &BinaryOperator,
@@ -244,6 +287,16 @@ impl TypeChecker {
             BinaryOperator::Subtraction => self.check_subtraction(left, right, token),
             BinaryOperator::Multiplication => self.check_multiplication(left, right, token),
             BinaryOperator::Division => self.check_division(left, right, token),
+
+            BinaryOperator::Equal => self.check_comparison(left, right, token),
+            BinaryOperator::NotEqual => self.check_comparison(left, right, token),
+            BinaryOperator::GreaterThan => self.check_comparison(left, right, token),
+            BinaryOperator::GreaterThanOrEqual => self.check_comparison(left, right, token),
+            BinaryOperator::LessThan => self.check_comparison(left, right, token),
+            BinaryOperator::LessThanOrEqual => self.check_comparison(left, right, token),
+
+            BinaryOperator::And => self.check_logical(left, right, token),
+            BinaryOperator::Or => self.check_logical(left, right, token),
         }
     }
 
@@ -353,6 +406,75 @@ impl TypeChecker {
         }
     }
 
+    fn check_comparison(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+        token: &Token,
+    ) -> Result<Type, ParseError> {
+        let left = self.check_instruction(left)?;
+        let right = self.check_instruction(right)?;
+
+        match (left, right) {
+            (Type::Int, Type::Int) => Ok(Type::Bool),
+            (Type::String, Type::String) | (Type::Bool, Type::Bool) => match token.value.as_str() {
+                "==" | "!=" => Ok(Type::Bool),
+                _ => Err(ParseError::new(
+                    ParseErrorType::MismatchedTypeBinary {
+                        expected_left: Type::Int,
+                        actual_left: Type::Int,
+                        expected_right: Type::Int,
+                        actual_right: Type::Int,
+                    },
+                    token.clone(),
+                    format!(
+                        "Comparison is not supported between `{}` and `{}`",
+                        left, right
+                    ),
+                )),
+            },
+
+            (t1, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedTypeBinary {
+                    expected_left: t1,
+                    actual_left: t1,
+                    expected_right: t1,
+                    actual_right: t2,
+                },
+                token.clone(),
+                format!("Comparison is not supported between `{}` and `{}`", t1, t2),
+            )),
+        }
+    }
+
+    fn check_logical(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+        token: &Token,
+    ) -> Result<Type, ParseError> {
+        let left = self.check_instruction(left)?;
+        let right = self.check_instruction(right)?;
+
+        match (left, right) {
+            (Type::Bool, Type::Bool) => Ok(Type::Bool),
+
+            (t1, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedTypeBinary {
+                    expected_left: Type::Bool,
+                    actual_left: t1,
+                    expected_right: Type::Bool,
+                    actual_right: t2,
+                },
+                token.clone(),
+                format!(
+                    "Logical operation is not supported between `{}` and `{}`",
+                    t1, t2
+                ),
+            )),
+        }
+    }
+
     fn check_type_cast(
         &mut self,
         instruction: &Instruction,
@@ -362,6 +484,9 @@ impl TypeChecker {
         match (instruction_type, r#type) {
             (Type::String, Type::Int) => Ok(Type::Int),
             (Type::Int, Type::String) => Ok(Type::String),
+
+            (Type::String, Type::Bool) => Ok(Type::Bool),
+            (Type::Bool, Type::String) => Ok(Type::String),
             (Type::String, Type::Regex) => Ok(Type::Regex),
             _ => Err(ParseError::new(
                 ParseErrorType::TypeCast {
@@ -371,6 +496,39 @@ impl TypeChecker {
                 instruction.token.clone(),
                 format!("Cannot cast {instruction_type} to {}", r#type),
             )),
+        }
+    }
+
+    fn check_conditional(
+        &mut self,
+        condition: &Instruction,
+        instruction: &Instruction,
+        r#else: &Instruction,
+    ) -> Result<Type, ParseError> {
+        let condition_type = self.check_instruction(&condition)?;
+        if condition_type != Type::Bool {
+            return Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: Type::Bool,
+                    actual: condition_type,
+                },
+                condition.token.clone(),
+                "Only booleans are allowed in conditions",
+            ));
+        }
+        let result = self.check_instruction(&instruction)?;
+        let result_else = self.check_instruction(&r#else)?;
+        if result == result_else {
+            Ok(result)
+        } else {
+            Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: result,
+                    actual: result_else,
+                },
+                instruction.token.clone(),
+                "Conditional return two types that don't match",
+            ))
         }
     }
 }
