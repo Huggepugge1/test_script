@@ -1,7 +1,7 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType};
-use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
@@ -61,17 +61,22 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Instruction, ParseError> {
-        let instruction = self.parse_expression(true)?;
+        let instruction = self.parse_expression(true, true)?;
         self.end_statement()?;
         Ok(instruction)
     }
 
-    fn parse_expression(&mut self, parse_binary: bool) -> Result<Instruction, ParseError> {
+    fn parse_expression(
+        &mut self,
+        parse_binary: bool,
+        parse_type_cast: bool,
+    ) -> Result<Instruction, ParseError> {
         let mut token = self.peek_next_token()?;
         let mut instruction = match token.r#type {
             TokenType::StringLiteral => self.parse_string_literal()?,
             TokenType::RegexLiteral => self.parse_regex_literal()?,
             TokenType::IntegerLiteral => self.parse_integer_literal()?,
+            TokenType::BooleanLiteral => self.parse_boolean_literal()?,
 
             TokenType::Keyword => self.parse_keyword()?,
             TokenType::BuiltIn => self.parse_builtin()?,
@@ -80,6 +85,19 @@ impl Parser {
 
             TokenType::OpenBlock => self.parse_block()?,
             TokenType::OpenParen => self.parse_parentheses()?,
+
+            TokenType::UnaryOperator => self.parse_unary_operator()?,
+            TokenType::BinaryOperator => match token.value.as_str() {
+                "-" => self.parse_unary_operator()?,
+                _ => {
+                    self.tokens.advance_to_next_instruction();
+                    return Err(ParseError::new(
+                        ParseErrorType::NotImplemented,
+                        token,
+                        "See discord for more information about comming features",
+                    ));
+                }
+            },
 
             TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
             _ => {
@@ -96,11 +114,14 @@ impl Parser {
         while token.binary_operator() {
             instruction = match token.r#type {
                 TokenType::BinaryOperator => match parse_binary {
-                    true => self.parse_operator(&instruction)?,
+                    true => self.parse_binary_operator(instruction)?,
                     false => break,
                 },
-                TokenType::TypeCast => self.parse_type_cast(&instruction)?,
-                TokenType::AssignmentOperator => self.parse_assignment(&instruction)?,
+                TokenType::TypeCast => match parse_type_cast {
+                    true => self.parse_type_cast(instruction)?,
+                    false => break,
+                },
+                TokenType::AssignmentOperator => self.parse_assignment(instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -144,18 +165,47 @@ impl Parser {
         }
     }
 
-    fn parse_operator(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
+    fn parse_unary_operator(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let operator = match token.value.as_str() {
+            "!" => UnaryOperator::Not,
+            "-" => UnaryOperator::Negation,
+            _ => unreachable!(),
+        };
+
+        let instruction = self.parse_expression(false, false)?;
+        Ok(Instruction::new(
+            InstructionType::UnaryOperation {
+                operator,
+                instruction: Box::new(instruction),
+            },
+            token,
+        ))
+    }
+
+    fn parse_binary_operator(
+        &mut self,
+        last_instruction: Instruction,
+    ) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let new_operator = match token.value.as_str() {
             "+" => BinaryOperator::Addition,
             "-" => BinaryOperator::Subtraction,
             "*" => BinaryOperator::Multiplication,
             "/" => BinaryOperator::Division,
+            "==" => BinaryOperator::Equal,
+            "!=" => BinaryOperator::NotEqual,
+            ">" => BinaryOperator::GreaterThan,
+            ">=" => BinaryOperator::GreaterThanOrEqual,
+            "<" => BinaryOperator::LessThan,
+            "<=" => BinaryOperator::LessThanOrEqual,
+            "&&" => BinaryOperator::And,
+            "||" => BinaryOperator::Or,
             _ => unreachable!(),
         };
 
-        let new_right = self.parse_expression(false)?;
-        match instruction.r#type {
+        let new_right = self.parse_expression(false, true)?;
+        match last_instruction.r#type {
             InstructionType::BinaryOperation {
                 ref operator,
                 ref left,
@@ -258,6 +308,26 @@ impl Parser {
         }
     }
 
+    fn parse_boolean_literal(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        if token.r#type != TokenType::BooleanLiteral {
+            self.tokens.advance_to_next_instruction();
+            Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType(
+                    TokenType::BooleanLiteral,
+                    token.clone().r#type,
+                ),
+                token.clone(),
+                format!("Token {:?} is not a boolean literal", token.value),
+            ))
+        } else {
+            Ok(Instruction::new(
+                InstructionType::BooleanLiteral(token.value.parse().unwrap()),
+                token,
+            ))
+        }
+    }
+
     fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
         let token = self.peek_next_token()?;
         match token.value.as_str() {
@@ -270,6 +340,15 @@ impl Parser {
                     ParseErrorType::UnexpectedToken,
                     token.clone(),
                     "\"in\" is not allowed outside of a for loop",
+                ))
+            }
+            "if" => self.parse_conditional(),
+            "else" => {
+                self.tokens.advance_to_next_instruction();
+                Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken,
+                    token.clone(),
+                    "\"else\" is not allowed outside of an if statement",
                 ))
             }
             _ => unreachable!(),
@@ -317,7 +396,7 @@ impl Parser {
                 "A type should be followed by an assignment operator in an assingnment",
             ));
         }
-        let instruction = self.parse_expression(true)?;
+        let instruction = self.parse_expression(true, true)?;
         let variable = Variable::new(
             identifier_name.clone(),
             token.value == "const",
@@ -383,7 +462,7 @@ impl Parser {
             ));
         }
 
-        let instruction = self.parse_expression(true)?;
+        let instruction = self.parse_expression(true, true)?;
         if self.environment.get(&variable.name).is_none() {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
@@ -427,7 +506,7 @@ impl Parser {
             TokenType::CloseParen => Ok(Instruction::NONE),
             _ => {
                 self.tokens.back();
-                self.parse_expression(true)
+                self.parse_expression(true, true)
             }
         }?;
 
@@ -473,6 +552,37 @@ impl Parser {
         Ok(Instruction::new(InstructionType::Block(block), token))
     }
 
+    fn parse_conditional(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let condition = self.parse_expression(true, true)?;
+        let statement = self.parse_expression(true, true)?;
+        match statement.r#type {
+            InstructionType::Block(_) => {
+                self.tokens.next();
+            }
+            _ => (),
+        }
+        let r#else = match self.peek_next_token()?.value.as_str() {
+            "else" => {
+                self.get_next_token()?;
+                self.parse_expression(true, true)?
+            }
+            _ => {
+                self.tokens.back();
+                Instruction::NONE
+            }
+        };
+
+        Ok(Instruction::new(
+            InstructionType::Conditional {
+                condition: Box::new(condition),
+                instruction: Box::new(statement),
+                r#else: Box::new(r#else),
+            },
+            token,
+        ))
+    }
+
     fn parse_for(&mut self) -> Result<Instruction, ParseError> {
         let token = self.peek_next_token()?;
 
@@ -503,7 +613,7 @@ impl Parser {
 
     fn parse_parentheses(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
-        let instruction = self.parse_expression(true)?;
+        let instruction = self.parse_expression(true, true)?;
         self.expect_token(TokenType::CloseParen)?;
         Ok(Instruction::new(
             InstructionType::Paren(Box::new(instruction)),

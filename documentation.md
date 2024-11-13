@@ -9,7 +9,7 @@ test_name("command") { ... }
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
 ## Types
-There are three types, `string`, `regex` and `int`.
+There are four types, `string`, `regex`, `int` and `bool`.
 
 ### Type casting
 To cast a type to another, use the `as` keyword.
@@ -56,6 +56,25 @@ Print the string to the console. Adds a newline at the end of the string.
 #### Syntax
 `println(string)`<br>
 
+## Conditionals
+The only conditional available is the if/else statement.
+
+### If
+If the condition is true, run the next statement.
+All conditions must be of type `bool`.
+#### Syntax
+`if condition { ... }`<br>
+
+### Else
+If the condition was false, run the next statement.
+#### Syntax
+`if condition { ... } else { ... }`<br>
+
+### Else if
+If the condition was false, check the next condition.
+#### Syntax
+`if condition { ... } else if condition { ... }`<br>
+
 ## Loops
 The only loop available is the for loop.
 
@@ -78,8 +97,6 @@ Note: The star operation repeats `0-max_len` inclusive times.
 `\`\\d\`` would create an iterable containg all digits 0-9.
 
 ## Operators
-There are 4 operators, `+`, `-`, `*` and `/`.
-
 ### Assignment
 Assigns the value of b to a. The let keyword is not needed when assigning a value to a variable that has not yet been defined.
 #### Syntax
@@ -114,6 +131,73 @@ Divides a by b.
 `a / b`<br>
 #### Supported types
 `int` / `int`<br>
+
+### Equal
+Checks if a is equal to b.
+#### Syntax
+`a == b`<br>
+#### Supported types
+`int` == `int`<br>
+`string` == `string`<br>
+`bool` == `bool`<br>
+
+### Not equal
+Checks if a is not equal to b.
+#### Syntax
+`a != b`<br>
+#### Supported types
+`int` != `int`<br>
+`string` != `string`<br>
+`bool` != `bool`<br>
+
+### Greater than
+Checks if a is greater than b.
+#### Syntax
+`a > b`<br>
+#### Supported types
+`int` > `int`<br>
+
+### Less than
+Checks if a is less than b.
+#### Syntax
+`a < b`<br>
+#### Supported types
+`int` < `int`<br>
+
+### Greater than or equal
+Checks if a is greater than or equal to b.
+#### Syntax
+`a >= b`<br>
+#### Supported types
+`int` >= `int`<br>
+
+### Less than or equal
+Checks if a is less than or equal to b.
+#### Syntax
+`a <= b`<br>
+#### Supported types
+`int` <= `int`<br>
+
+### And
+Checks if a and b are both true.
+#### Syntax
+`a && b`<br>
+#### Supported types
+`bool` && `bool`<br>
+
+### Or
+Checks if a or b is true.
+#### Syntax
+`a || b`<br>
+#### Supported types
+`bool` || `bool`<br>
+
+### Not
+Checks if a is false.
+#### Syntax
+`!a`<br>
+#### Supported types
+`!bool`<br>
 
 ## Comments
 Comments are written by `//`.
