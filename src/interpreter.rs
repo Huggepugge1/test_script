@@ -12,6 +12,7 @@ pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
     Integer(i64),
+    Boolean(bool),
     None,
 }
 
@@ -21,6 +22,7 @@ impl std::fmt::Display for InstructionResult {
             InstructionResult::String(s) => write!(f, "{}", s),
             InstructionResult::Regex(s) => write!(f, "{:?}", s),
             InstructionResult::Integer(i) => write!(f, "{}", i),
+            InstructionResult::Boolean(b) => write!(f, "{}", b),
             InstructionResult::None => write!(f, "()"),
         }
     }
@@ -242,6 +244,22 @@ impl Test {
         Ok(result)
     }
 
+    fn interpret_conditional(
+        &mut self,
+        condition: Instruction,
+        instruction: Instruction,
+        r#else: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let condition = self.interpret_instruction(condition)?;
+        match condition {
+            InstructionResult::Boolean(true) => self.interpret_instruction(instruction),
+            InstructionResult::Boolean(false) => self.interpret_instruction(r#else),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
     fn interpret_for(
         &mut self,
         assignment: Instruction,
@@ -322,12 +340,18 @@ impl Test {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
             InstructionType::IntegerLiteral(value) => InstructionResult::Integer(value),
+            InstructionType::BooleanLiteral(value) => InstructionResult::Boolean(value),
 
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
 
             InstructionType::Block(instructions) => self.interpret_block(instructions)?,
             InstructionType::Paren(instruction) => self.interpret_instruction(*instruction)?,
 
+            InstructionType::Conditional {
+                condition,
+                instruction,
+                r#else,
+            } => self.interpret_conditional(*condition, *instruction, *r#else)?,
             InstructionType::For(assignment, instruction) => {
                 self.interpret_for(*assignment, *instruction)?
             }

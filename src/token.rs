@@ -3,6 +3,7 @@ pub enum TokenType {
     StringLiteral,
     RegexLiteral,
     IntegerLiteral,
+    BooleanLiteral,
 
     Keyword,
     BuiltIn,
@@ -33,6 +34,7 @@ impl std::fmt::Display for TokenType {
             TokenType::StringLiteral => write!(f, "String literal"),
             TokenType::RegexLiteral => write!(f, "Regex literal"),
             TokenType::IntegerLiteral => write!(f, "Integer literal"),
+            TokenType::BooleanLiteral => write!(f, "Boolean literal"),
 
             TokenType::Keyword => write!(f, "Keyword"),
             TokenType::BuiltIn => write!(f, "BuiltIn"),

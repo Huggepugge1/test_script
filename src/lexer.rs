@@ -14,8 +14,9 @@ impl<'a> Lexer<'a> {
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
-            "for" | "let" | "const" => TokenType::Keyword,
-            "string" | "regex" | "int" => TokenType::Type,
+            "for" | "let" | "const" | "if" | "else" => TokenType::Keyword,
+            "string" | "regex" | "int" | "bool" => TokenType::Type,
+            "true" | "false" => TokenType::BooleanLiteral,
             "in" => TokenType::AssignmentOperator,
             "as" => TokenType::TypeCast,
             "input" | "output" | "print" | "println" => TokenType::BuiltIn,

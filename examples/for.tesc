@@ -1,6 +1,6 @@
 test_for("./app") {
 	input("start");
-	for i: string in /\d{3}/  { // Loop over all 3 digit numbers
+	for i: string in `\d{3}`  { // Loop over all 3 digit numbers
 		input(i);
 		output(i);
 	}
@@ -9,7 +9,7 @@ test_for("./app") {
 
 test_for_2("./app") {
 	input("start");
-	for i: string in /\w{3}/  { // Loop over all 3 letter words
+	for i: string in `\w{3}`  { // Loop over all 3 letter words
 		input(i);
 		output(i);
 	}
@@ -18,7 +18,7 @@ test_for_2("./app") {
 
 test_for_3("./app") {
 	input("start");
-	let numbers: regex = /\d{3}/;
+	let numbers: regex = `\d{3}`;
 	for i: string in numbers  {
 		input(i);
 		output(i);

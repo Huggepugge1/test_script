@@ -72,6 +72,7 @@ impl Parser {
             TokenType::StringLiteral => self.parse_string_literal()?,
             TokenType::RegexLiteral => self.parse_regex_literal()?,
             TokenType::IntegerLiteral => self.parse_integer_literal()?,
+            TokenType::BooleanLiteral => self.parse_boolean_literal()?,
 
             TokenType::Keyword => self.parse_keyword()?,
             TokenType::BuiltIn => self.parse_builtin()?,
@@ -261,6 +262,26 @@ impl Parser {
         }
     }
 
+    fn parse_boolean_literal(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        if token.r#type != TokenType::BooleanLiteral {
+            self.tokens.advance_to_next_instruction();
+            Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType(
+                    TokenType::BooleanLiteral,
+                    token.clone().r#type,
+                ),
+                token.clone(),
+                format!("Token {:?} is not a boolean literal", token.value),
+            ))
+        } else {
+            Ok(Instruction::new(
+                InstructionType::BooleanLiteral(token.value.parse().unwrap()),
+                token,
+            ))
+        }
+    }
+
     fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
         let token = self.peek_next_token()?;
         match token.value.as_str() {
@@ -273,6 +294,15 @@ impl Parser {
                     ParseErrorType::UnexpectedToken,
                     token.clone(),
                     "\"in\" is not allowed outside of a for loop",
+                ))
+            }
+            "if" => self.parse_conditional(),
+            "else" => {
+                self.tokens.advance_to_next_instruction();
+                Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken,
+                    token.clone(),
+                    "\"else\" is not allowed outside of an if statement",
                 ))
             }
             _ => unreachable!(),
@@ -474,6 +504,30 @@ impl Parser {
         }
         self.environment.remove_scope();
         Ok(Instruction::new(InstructionType::Block(block), token))
+    }
+
+    fn parse_conditional(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let condition = self.parse_expression(true)?;
+        let statement = self.parse_statement()?;
+        let r#else = match self.peek_next_token()?.value.as_str() {
+            "else" => {
+                self.get_next_token()?;
+                self.parse_statement()?
+            }
+            _ => Instruction::NONE,
+        };
+
+        self.tokens.back();
+
+        Ok(Instruction::new(
+            InstructionType::Conditional {
+                condition: Box::new(condition),
+                instruction: Box::new(statement),
+                r#else: Box::new(r#else),
+            },
+            token,
+        ))
     }
 
     fn parse_for(&mut self) -> Result<Instruction, ParseError> {

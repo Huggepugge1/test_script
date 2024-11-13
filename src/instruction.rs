@@ -65,6 +65,7 @@ pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
     IntegerLiteral(i64),
+    BooleanLiteral(bool),
 
     BuiltIn(BuiltIn),
 
@@ -73,6 +74,11 @@ pub enum InstructionType {
 
     Test(Box<Instruction>, String, String),
     For(Box<Instruction>, Box<Instruction>),
+    Conditional {
+        condition: Box<Instruction>,
+        instruction: Box<Instruction>,
+        r#else: Box<Instruction>,
+    },
 
     Assignment {
         variable: Variable,

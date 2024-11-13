@@ -49,6 +49,7 @@ impl TypeChecker {
             InstructionType::StringLiteral(_) => Ok(Type::String),
             InstructionType::RegexLiteral(_) => Ok(Type::Regex),
             InstructionType::IntegerLiteral(_) => Ok(Type::Int),
+            InstructionType::BooleanLiteral(_) => Ok(Type::Bool),
 
             InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
 
@@ -63,6 +64,12 @@ impl TypeChecker {
             }
 
             InstructionType::Paren(instruction) => self.check_instruction(instruction),
+
+            InstructionType::Conditional {
+                condition,
+                instruction,
+                r#else,
+            } => self.check_conditional(condition, instruction, r#else),
 
             InstructionType::For(assignment, statement) => {
                 self.environment.add_scope();
@@ -371,6 +378,39 @@ impl TypeChecker {
                 instruction.token.clone(),
                 format!("Cannot cast {instruction_type} to {}", r#type),
             )),
+        }
+    }
+
+    fn check_conditional(
+        &mut self,
+        condition: &Instruction,
+        instruction: &Instruction,
+        r#else: &Instruction,
+    ) -> Result<Type, ParseError> {
+        let condition_type = self.check_instruction(&condition)?;
+        if condition_type != Type::Bool {
+            return Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: Type::Bool,
+                    actual: condition_type,
+                },
+                condition.token.clone(),
+                "Only booleans are allowed in conditions",
+            ));
+        }
+        let result = self.check_instruction(&instruction)?;
+        let result_else = self.check_instruction(&r#else)?;
+        if result == result_else {
+            Ok(result)
+        } else {
+            Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: result,
+                    actual: result_else,
+                },
+                instruction.token.clone(),
+                "Conditional return two types that don't match",
+            ))
         }
     }
 }

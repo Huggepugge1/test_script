@@ -1,18 +1,11 @@
-test1("./input_test") {
-    let i: int = 1 + 2 * 3 + 4;
-    let j: string = i as string;
-    println(j);
+test("./input_test") {
+    let x: bool = true;
+    let y: string =  if x "This should cause an error"; else "String";
+    
 
-    let j: int = "1" as int;
-    let k: string = j as string;
+    println(y);
 
-    input("q");
-    output("q");
-}
-
-test2("./input_test") {
-    const i: int = 1;
-    println(i as string);
-    input("q");
-    output("q");
+    const quit: string = "q";
+    input(quit);
+    output(quit);
 }
