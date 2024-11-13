@@ -9,7 +9,9 @@ pub fn run(args: cli::Args) {
 
     match program {
         Ok(program) => match type_checker::TypeChecker::new(program.clone(), args).check() {
-            Ok(()) => interpreter::Interpreter::new(program).interpret(),
+            Ok(()) => {
+                interpreter::Interpreter::new(program).interpret();
+            }
             Err(_) => (),
         },
         Err(_) => (),

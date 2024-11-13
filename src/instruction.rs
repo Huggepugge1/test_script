@@ -20,6 +20,31 @@ pub enum BinaryOperator {
     Division,
 }
 
+impl std::fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                BinaryOperator::And => "&&",
+                BinaryOperator::Or => "||",
+
+                BinaryOperator::Equal => "==",
+                BinaryOperator::NotEqual => "!=",
+                BinaryOperator::GreaterThan => ">",
+                BinaryOperator::GreaterThanOrEqual => ">=",
+                BinaryOperator::LessThan => "<",
+                BinaryOperator::LessThanOrEqual => "<=",
+
+                BinaryOperator::Addition => "+",
+                BinaryOperator::Subtraction => "-",
+                BinaryOperator::Multiplication => "*",
+                BinaryOperator::Division => "/",
+            }
+        )
+    }
+}
+
 impl BinaryOperator {
     pub fn value(&self) -> Self {
         match self {
@@ -52,12 +77,16 @@ pub enum UnaryOperator {
     Negation,
 }
 
-impl UnaryOperator {
-    pub fn value(&self) -> Self {
-        match self {
-            UnaryOperator::Not => Self::Not,
-            UnaryOperator::Negation => Self::Negation,
-        }
+impl std::fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                UnaryOperator::Not => "!",
+                UnaryOperator::Negation => "-",
+            }
+        )
     }
 }
 
@@ -75,14 +104,87 @@ pub struct Instruction {
     pub token: Token,
 }
 
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self.r#type {
+                InstructionType::StringLiteral(ref value) => value.clone(),
+                InstructionType::RegexLiteral(ref value) => format!("{:?}", value),
+                InstructionType::IntegerLiteral(ref value) => value.to_string(),
+                InstructionType::BooleanLiteral(ref value) => value.to_string(),
+
+                InstructionType::BuiltIn(ref built_in) => match built_in {
+                    BuiltIn::Input(ref instruction) => format!("input({})", instruction),
+                    BuiltIn::Output(ref instruction) => format!("output({})", instruction),
+                    BuiltIn::Print(ref instruction) => format!("print({})", instruction),
+                    BuiltIn::Println(ref instruction) => format!("println({})", instruction),
+                },
+
+                InstructionType::Block(ref instructions) => {
+                    let mut result = String::new();
+                    for instruction in instructions {
+                        result.push_str(&format!("{}\n", instruction));
+                    }
+                    result
+                }
+                InstructionType::Paren(ref instruction) => format!("({})", instruction),
+
+                InstructionType::Test(ref left, ref operator, ref right) => {
+                    format!("{} {} {}", left, operator, right)
+                }
+                InstructionType::For(ref variable, ref instruction) => {
+                    format!("for {} in {}", variable, instruction)
+                }
+                InstructionType::Conditional {
+                    ref condition,
+                    ref instruction,
+                    ref r#else,
+                } => format!(
+                    "if {} {{\n{}\n}} else {{\n{}\n}}",
+                    condition, instruction, r#else
+                ),
+
+                InstructionType::Assignment {
+                    ref variable,
+                    ref instruction,
+                } => format!("{} = {}", variable, instruction),
+                InstructionType::IterableAssignment(ref variable, ref instruction) => {
+                    format!("{} in {}", variable, instruction)
+                }
+                InstructionType::Variable(ref variable) => variable.to_string(),
+
+                InstructionType::UnaryOperation {
+                    ref operator,
+                    ref instruction,
+                } => format!("{}{}", operator, instruction),
+                InstructionType::BinaryOperation {
+                    ref operator,
+                    ref left,
+                    ref right,
+                } => format!("{} {} {}", left, operator, right),
+
+                InstructionType::TypeCast {
+                    ref instruction,
+                    ref r#type,
+                } => format!("{} as {}", instruction, r#type),
+
+                InstructionType::None => String::new(),
+            }
+        )
+    }
+}
+
 impl Instruction {
     pub const NONE: Instruction = Instruction {
         r#type: InstructionType::None,
         token: Token {
             r#type: TokenType::None,
             value: String::new(),
-            line: 0,
+            row: 0,
             column: 0,
+            line: String::new(),
         },
     };
 

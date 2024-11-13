@@ -7,6 +7,18 @@ pub struct Variable {
     pub r#type: Type,
 }
 
+impl std::fmt::Display for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}: {}",
+            if self.r#const { "const " } else { "" },
+            self.name,
+            self.r#type
+        )
+    }
+}
+
 impl Variable {
     pub fn new(name: String, r#const: bool, r#type: Type) -> Self {
         Self {

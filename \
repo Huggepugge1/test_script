@@ -114,12 +114,12 @@ impl ParseError {
             return;
         }
         eprintln!(
-            "{}{}              \n\
+            "{}{}         \n\
                                \n\
              {}                \n\
                                \n\
              hint: {}          \n",
-            "error: ".bright_red(),
+            "error: ".red(),
             self.r#type,
             self.token,
             self.hint
@@ -159,15 +159,9 @@ impl ParseWarning {
             return;
         }
         eprintln!(
-            "{}{}              \n\
-                               \n\
-             {}                \n\
-                               \n\
-             hint: {}          \n",
-            "warning: ".bright_yellow(),
-            self.r#type,
-            self.token,
-            self.hint
+            "Warning: {}, {}:{}\n\
+             Hint: {}\n",
+            self.r#type, self.token.row, self.token.column, self.hint
         );
     }
 }

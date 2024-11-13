@@ -118,10 +118,10 @@ impl Parser {
                     false => break,
                 },
                 TokenType::TypeCast => match parse_type_cast {
-                    true => self.parse_type_cast(instruction)?,
+                    true => self.parse_type_cast(&instruction)?,
                     false => break,
                 },
-                TokenType::AssignmentOperator => self.parse_assignment(instruction)?,
+                TokenType::AssignmentOperator => self.parse_assignment(&instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -158,8 +158,12 @@ impl Parser {
                 format!("Token {:?} is not a string literal", token.value),
             ))
         } else {
+            let mut string = token.value.clone();
+            if string.len() > 2 {
+                string = string[1..string.len() - 1].to_string();
+            }
             Ok(Instruction::new(
-                InstructionType::StringLiteral(token.value.clone()),
+                InstructionType::StringLiteral(string),
                 token,
             ))
         }
@@ -185,7 +189,7 @@ impl Parser {
 
     fn parse_binary_operator(
         &mut self,
-        last_instruction: Instruction,
+        instruction: Instruction,
     ) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let new_operator = match token.value.as_str() {
@@ -205,7 +209,7 @@ impl Parser {
         };
 
         let new_right = self.parse_expression(false, true)?;
-        match last_instruction.r#type {
+        match instruction.r#type {
             InstructionType::BinaryOperation {
                 ref operator,
                 ref left,

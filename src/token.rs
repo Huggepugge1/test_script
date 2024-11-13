@@ -1,3 +1,5 @@
+use colored::Colorize;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     StringLiteral,
@@ -68,26 +70,20 @@ impl std::fmt::Display for TokenType {
 pub struct Token {
     pub r#type: TokenType,
     pub value: String,
-    pub line: u32,
+    pub row: u32,
     pub column: u32,
+
+    pub line: String,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, value: &String, line: u32, column: u32) -> Token {
-        Token {
-            r#type,
-            value: value.to_string(),
-            line,
-            column,
-        }
-    }
-
     pub fn none() -> Token {
         Token {
             r#type: TokenType::None,
             value: String::new(),
-            line: 0,
+            row: 0,
             column: 0,
+            line: String::new(),
         }
     }
 
@@ -95,6 +91,25 @@ impl Token {
         self.r#type == TokenType::BinaryOperator
             || self.r#type == TokenType::AssignmentOperator
             || self.r#type == TokenType::TypeCast
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let padding = &" ".repeat(7 + self.column as usize);
+        write!(
+            f,
+            "{:<8}{}\n\
+             {}{}",
+            self.row.to_string().color(colored::Color::TrueColor {
+                r: 0x9F,
+                g: 0xFE,
+                b: 0xBF,
+            }),
+            self.line,
+            padding,
+            "^".repeat(self.value.len()),
+        )
     }
 }
 
