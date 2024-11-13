@@ -1,18 +1,18 @@
 test1("./input_test") {
-    for i: string in `\d{1,3}` {
-        input(i);
-        output(i);
-    }
+    let i: int = 1 + 2 * 3 + 4;
+    let j: string = i as string;
+    println(j);
 
-    const a: int = 1;
-    let a: string = "1";
-    a = a + "1";
-    println(a);
+    let j: int = "1" as int;
+    let k: string = j as string;
 
-    let s: string = "123";
-    s = s + "456";
-    println(s);
+    input("q");
+    output("q");
+}
 
+test2("./input_test") {
+    const i: int = 1;
+    println(i as string);
     input("q");
     output("q");
 }
