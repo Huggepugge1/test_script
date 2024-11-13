@@ -138,6 +138,7 @@ impl<'a> Lexer<'a> {
                     column,
                 )),
                 '/' => {
+                    self.contents.next();
                     if let Some('/') = self.contents.peek() {
                         while let Some(next) = self.contents.next() {
                             if next == '\n' {
@@ -151,16 +152,123 @@ impl<'a> Lexer<'a> {
                             &"/".to_string(),
                             line,
                             column,
-                        ))
+                        ));
+                        column += 1;
                     }
                 }
                 ':' => tokens.push(Token::new(TokenType::Colon, &":".to_string(), line, column)),
-                '=' => tokens.push(Token::new(
-                    TokenType::AssignmentOperator,
-                    &"=".to_string(),
-                    line,
-                    column,
-                )),
+                '<' => {
+                    self.contents.next();
+                    if let Some('=') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"<=".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"<".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                        continue;
+                    }
+                }
+                '>' => {
+                    self.contents.next();
+                    if let Some('=') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &">=".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &">".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                        continue;
+                    }
+                }
+                '=' => {
+                    self.contents.next();
+                    if let Some('=') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"==".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenType::AssignmentOperator,
+                            &"=".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                        continue;
+                    }
+                }
+                '!' => {
+                    self.contents.next();
+                    if let Some('=') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"!=".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        tokens.push(Token::new(
+                            TokenType::UnaryOperator,
+                            &"!".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                        continue;
+                    }
+                }
+                '&' => {
+                    self.contents.next();
+                    if let Some('&') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"&&".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        panic!("Unexpected character: \"&\"");
+                    }
+                }
+                '|' => {
+                    self.contents.next();
+                    if let Some('|') = self.contents.peek() {
+                        tokens.push(Token::new(
+                            TokenType::BinaryOperator,
+                            &"||".to_string(),
+                            line,
+                            column,
+                        ));
+                        column += 1;
+                    } else {
+                        panic!("Unexpected character: \"|\"");
+                    }
+                }
                 'a'..='z' | 'A'..='Z' | '_' => {
                     tokens.push(self.tokenize_identifier(line, &mut column));
                     continue;

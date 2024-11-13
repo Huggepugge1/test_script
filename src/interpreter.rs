@@ -1,13 +1,13 @@
 use crate::environment::Environment;
 use crate::error::{InterpreterError, InterpreterErrorType};
-use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType};
+use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
 use crate::variable::Variable;
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
 use std::process::{Child, Command, Stdio};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
@@ -108,6 +108,43 @@ impl Test {
         eprintln!("{} failed: {}", self.name, message);
     }
 
+    fn interpret_unary_operation(
+        &mut self,
+        operator: UnaryOperator,
+        instruction: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        match operator {
+            UnaryOperator::Not => self.interpret_not(instruction),
+            UnaryOperator::Negation => self.interpret_negation(instruction),
+        }
+    }
+
+    fn interpret_not(
+        &mut self,
+        instruction: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let value = self.interpret_instruction(instruction)?;
+        match value {
+            InstructionResult::Boolean(value) => Ok(InstructionResult::Boolean(!value)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_negation(
+        &mut self,
+        instruction: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let value = self.interpret_instruction(instruction)?;
+        match value {
+            InstructionResult::Integer(value) => Ok(InstructionResult::Integer(-value)),
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
     fn interpret_binary_operation(
         &mut self,
         operator: BinaryOperator,
@@ -119,6 +156,16 @@ impl Test {
             BinaryOperator::Subtraction => self.interpret_subtraction(left, right),
             BinaryOperator::Multiplication => self.interpret_multiplication(left, right),
             BinaryOperator::Division => self.interpret_division(left, right),
+
+            BinaryOperator::Equal => self.interpret_equal(left, right),
+            BinaryOperator::NotEqual => self.interpret_not_equal(left, right),
+            BinaryOperator::GreaterThan => self.interpret_greater_than(left, right),
+            BinaryOperator::GreaterThanOrEqual => self.interpret_greater_than_or_equal(left, right),
+            BinaryOperator::LessThan => self.interpret_less_than(left, right),
+            BinaryOperator::LessThanOrEqual => self.interpret_less_than_or_equal(left, right),
+
+            BinaryOperator::And => self.interpret_and(left, right),
+            BinaryOperator::Or => self.interpret_or(left, right),
         }
     }
 
@@ -189,6 +236,128 @@ impl Test {
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Integer(left / right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_equal(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        Ok(InstructionResult::Boolean(left == right))
+    }
+
+    fn interpret_not_equal(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        Ok(InstructionResult::Boolean(left != right))
+    }
+
+    fn interpret_greater_than(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Boolean(left > right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_greater_than_or_equal(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Boolean(left >= right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_less_than(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Boolean(left < right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_less_than_or_equal(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Boolean(left <= right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_and(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Boolean(left), InstructionResult::Boolean(right)) => {
+                Ok(InstructionResult::Boolean(left && right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_or(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Boolean(left), InstructionResult::Boolean(right)) => {
+                Ok(InstructionResult::Boolean(left || right))
             }
             _ => {
                 unreachable!()
@@ -362,6 +531,11 @@ impl Test {
             InstructionType::Variable(var) => self.interpret_variable(var)?,
 
             InstructionType::None => InstructionResult::None,
+
+            InstructionType::UnaryOperation {
+                operator,
+                instruction,
+            } => self.interpret_unary_operation(operator, *instruction)?,
             InstructionType::BinaryOperation {
                 operator,
                 left,

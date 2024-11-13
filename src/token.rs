@@ -21,6 +21,8 @@ pub enum TokenType {
 
     TypeCast,
     AssignmentOperator,
+
+    UnaryOperator,
     BinaryOperator,
 
     Semicolon,
@@ -51,7 +53,9 @@ impl std::fmt::Display for TokenType {
 
             TokenType::TypeCast => write!(f, "Type cast"),
             TokenType::AssignmentOperator => write!(f, "Assignment operator"),
-            TokenType::BinaryOperator => write!(f, "operator"),
+
+            TokenType::UnaryOperator => write!(f, "Unary operator"),
+            TokenType::BinaryOperator => write!(f, "Binary operator"),
 
             TokenType::Semicolon => write!(f, "Semicolon"),
 
