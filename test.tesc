@@ -15,4 +15,7 @@ test2("./input_test") {
     println(i as string);
     input("q");
     output("q");
+    for i: string in `\d{3}` {
+        
+    }
 }
