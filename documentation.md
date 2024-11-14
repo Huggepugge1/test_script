@@ -91,7 +91,7 @@ Creates an iterable containing all the different combinations that the Regex mat
 Note: The star operation repeats `0-max_len` inclusive times.
 `max_len` is set by the command line argument `--max-len`.
 #### Syntax
-```\`regular expression\````<br>
+`\`regular expression\``<br>
 
 #### Example
 `\`\\d\`` would create an iterable containg all digits 0-9.
