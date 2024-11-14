@@ -1,5 +1,4 @@
 test("./input_test") {
-    "string"
     println("string == string");
     if "string" == "string" println("true") else println("false");
     println("string != string");
@@ -61,6 +60,13 @@ test("./input_test") {
     println("-1");
     println(-1 as string);
 
+    const quit: string = "q";
+    input(quit);
+    output(quit);
+}
+
+test2("./input_test") {
+    println("error");
     const quit: string = "q";
     input(quit);
     output(quit);

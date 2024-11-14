@@ -6,12 +6,11 @@ use colored::Colorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
-    UnexpectedToken {
-        expected: TokenType,
-        actual: TokenType,
-    },
+    UnexpectedToken(TokenType),
 
     UnexpectedEndOfFile,
+
+    UnclosedDelimiter(TokenType),
 
     MismatchedType {
         expected: Type,
@@ -23,7 +22,10 @@ pub enum ParseErrorType {
         expected_right: Type,
         actual_right: Type,
     },
-    MismatchedTokenType(TokenType, TokenType),
+    MismatchedTokenType {
+        expected: TokenType,
+        actual: TokenType,
+    },
 
     TypeCast {
         from: Type,
@@ -45,14 +47,22 @@ pub enum ParseErrorType {
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::UnexpectedToken { expected, actual } => {
-                write!(f, "expected {expected}, found {actual}")
+            ParseErrorType::UnexpectedToken(token) => {
+                write!(f, "Unexpected token: {}", token)
             }
 
             ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
 
+            ParseErrorType::UnclosedDelimiter(token) => {
+                write!(f, "Unclosed delimiter: {}", token)
+            }
+
             ParseErrorType::MismatchedType { expected, actual } => {
-                write!(f, "Mismatched type: Expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "Mismatched type: Expected `{}`, got `{}`",
+                    expected, actual
+                )
             }
             ParseErrorType::MismatchedTypeBinary {
                 expected_left,
@@ -66,11 +76,10 @@ impl std::fmt::Display for ParseErrorType {
                     expected_left, expected_right, actual_left, actual_right
                 )
             }
-            ParseErrorType::MismatchedTokenType(type1, type2) => {
+            ParseErrorType::MismatchedTokenType { expected, actual } => {
                 write!(
                     f,
-                    "Mismatched token type: Expected {}, got {}",
-                    type1, type2
+                    "Mismatched token type: Expected {expected}, got {actual}",
                 )
             }
 
@@ -116,7 +125,7 @@ impl ParseError {
         }
 
         match &self.r#type {
-            ParseErrorType::UnexpectedToken {
+            ParseErrorType::MismatchedTokenType {
                 expected: TokenType::Semicolon,
                 actual: _actual,
             } => match &self.token.last_token {

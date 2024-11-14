@@ -73,6 +73,8 @@ pub fn parse(token: &Token, max: u32) -> Result<Vec<String>, ParseError> {
         crate::token::TokenType::RegexLiteral { value } => value,
         _ => unreachable!(),
     };
-    let kind = regex_syntax::parse(value).unwrap().into_kind();
+    let kind = regex_syntax::parse(&value[1..value.len() - 1])
+        .unwrap()
+        .into_kind();
     parse_kind(kind.clone(), token, max)
 }

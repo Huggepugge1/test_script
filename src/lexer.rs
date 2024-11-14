@@ -126,7 +126,7 @@ impl<'a> Lexer<'a> {
     pub fn tokenize_regex_literal(&mut self) -> Token {
         let mut new_row = self.row;
         let mut new_column = self.column + 1;
-        let mut current = String::new();
+        let mut current = String::from("`");
 
         self.contents.next();
 

@@ -33,12 +33,12 @@ impl Parser {
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
-                        ParseErrorType::MismatchedTokenType(
-                            TokenType::Identifier {
+                        ParseErrorType::MismatchedTokenType {
+                            expected: TokenType::Identifier {
                                 value: "test".to_string(),
                             },
-                            r#type,
-                        ),
+                            actual: r#type,
+                        },
                         token,
                     ))
                 }
@@ -208,6 +208,18 @@ impl Parser {
         };
 
         let new_right = self.parse_expression(false, true)?;
+        match new_right {
+            Instruction {
+                r#type: InstructionType::None,
+                ..
+            } => {
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken(TokenType::Semicolon),
+                    token.clone(),
+                ))
+            }
+            _ => (),
+        }
         match instruction.r#type {
             InstructionType::BinaryOperation {
                 ref operator,
@@ -257,10 +269,10 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType(
-                        TokenType::Type { value: Type::Any },
-                        token.clone().r#type,
-                    ),
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::Type { value: Type::Any },
+                        actual: token.clone().r#type,
+                    },
                     token.clone(),
                 ));
             }
@@ -318,12 +330,7 @@ impl Parser {
                 _ => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
-                        ParseErrorType::UnexpectedToken {
-                            expected: TokenType::Identifier {
-                                value: String::new(),
-                            },
-                            actual: token.r#type.clone(),
-                        },
+                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
                         token.clone(),
                     ))
                 }
@@ -345,12 +352,12 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType(
-                        TokenType::Identifier {
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::Identifier {
                             value: String::new(),
                         },
-                        identifier.r#type.clone(),
-                    ),
+                        actual: identifier.r#type.clone(),
+                    },
                     identifier,
                 ));
             }
@@ -363,25 +370,28 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType(
-                        TokenType::Type { value: Type::Any },
-                        identifier.r#type.clone(),
-                    ),
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::Type { value: Type::Any },
+                        actual: identifier.r#type.clone(),
+                    },
                     identifier,
                 ));
             }
         };
 
         let assignment = self.get_next_token()?;
-        if assignment.r#type != TokenType::AssignmentOperator {
-            self.tokens.advance_to_next_instruction();
-            return Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType(
-                    TokenType::AssignmentOperator,
-                    assignment.r#type.clone(),
-                ),
-                assignment,
-            ));
+        match &assignment.r#type {
+            TokenType::AssignmentOperator | TokenType::IterableAssignmentOperator => (),
+            _ => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::AssignmentOperator,
+                        actual: assignment.r#type.clone(),
+                    },
+                    assignment,
+                ));
+            }
         }
         let instruction = self.parse_expression(true, true)?;
         let variable = Variable::new(identifier_name.clone(), r#const, r#type.clone());
@@ -414,12 +424,7 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken {
-                        expected: TokenType::Identifier {
-                            value: String::new(),
-                        },
-                        actual: token.r#type.clone(),
-                    },
+                    ParseErrorType::UnexpectedToken(token.r#type.clone()),
                     token.clone(),
                 ));
             }
@@ -436,10 +441,10 @@ impl Parser {
         if token.r#type != TokenType::AssignmentOperator {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType(
-                    TokenType::AssignmentOperator,
-                    token.r#type.clone(),
-                ),
+                ParseErrorType::MismatchedTokenType {
+                    expected: TokenType::AssignmentOperator,
+                    actual: token.clone().r#type,
+                },
                 token,
             ));
         }
@@ -535,7 +540,16 @@ impl Parser {
                     self.success = false;
                 }
             }
-            next_token = self.peek_next_token()?;
+            next_token = match self.peek_next_token() {
+                Ok(token) => token,
+                Err(_) => {
+                    self.tokens.advance_to_next_instruction();
+                    return Err(ParseError::new(
+                        ParseErrorType::UnclosedDelimiter(TokenType::CloseBlock),
+                        token,
+                    ));
+                }
+            }
         }
         self.environment.remove_scope();
         Ok(Instruction::new(InstructionType::Block(block), token))
@@ -548,6 +562,13 @@ impl Parser {
         match statement.r#type {
             InstructionType::Block(_) => {
                 self.tokens.next();
+            }
+            InstructionType::None => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
+                    self.tokens.current().unwrap(),
+                ));
             }
             _ => (),
         }
@@ -621,7 +642,10 @@ impl Parser {
         if token.r#type != expected {
             self.tokens.advance_to_next_instruction();
             Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType(expected, token.clone().r#type),
+                ParseErrorType::MismatchedTokenType {
+                    expected,
+                    actual: token.clone().r#type,
+                },
                 token.clone(),
             ))
         } else {
@@ -636,7 +660,7 @@ impl Parser {
             _ => {
                 self.tokens.back();
                 Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken {
+                    ParseErrorType::MismatchedTokenType {
                         expected: TokenType::Semicolon,
                         actual: token.clone().r#type,
                     },

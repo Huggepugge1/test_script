@@ -147,7 +147,10 @@ impl Token {
     const LINE_NUMBER_PADDING: usize = 4;
 
     pub fn as_string(&self, style: PrintStyle) -> String {
-        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row as usize);
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
         let padding = &" ".repeat(padding_length + self.column as usize - 1);
         format!(
             "{:<4}{}      \n\
@@ -167,7 +170,10 @@ impl Token {
     }
 
     pub fn expected_semicolon(&self) -> String {
-        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row as usize);
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
         let padding = &" ".repeat(padding_length + self.column as usize + self.len() - 1);
         format!(
             "{:<4}{}      \n\
