@@ -1,6 +1,6 @@
 test("./input_test") {
-;
-    println("string == string")
+    "string"
+    println("string == string");
     if "string" == "string" println("true") else println("false");
     println("string != string");
     if "string" != "string" println("true") else println("false");

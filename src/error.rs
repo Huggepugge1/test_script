@@ -199,13 +199,11 @@ impl ParseWarning {
         eprintln!(
             "{}{}              \n\
                                \n\
-             {}                \n\
-                               \n\
-             hint: {}          \n",
+             {} {}              \n",
             "warning: ".bright_yellow(),
             self.r#type,
             self.token.as_string(PrintStyle::Warning),
-            self.hint
+            "remove this semicolon".bright_yellow(),
         );
     }
 }

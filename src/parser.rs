@@ -151,7 +151,7 @@ impl Parser {
 
         match &token.r#type {
             TokenType::StringLiteral { value } => Ok(Instruction::new(
-                InstructionType::StringLiteral(value.to_string()),
+                InstructionType::StringLiteral(value.to_string()[1..value.len() - 1].to_string()),
                 token,
             )),
             _ => unreachable!(),

@@ -109,7 +109,10 @@ impl Token {
 
     pub fn len(&self) -> usize {
         match &self.r#type {
-            TokenType::StringLiteral { value } => value.len(),
+            TokenType::StringLiteral { value } => {
+                println!("value: {}", value);
+                value.len()
+            }
             TokenType::RegexLiteral { value } => value.len(),
             TokenType::IntegerLiteral { value } => value.to_string().len(),
             TokenType::BooleanLiteral { value } => value.to_string().len(),
@@ -165,7 +168,7 @@ impl Token {
 
     pub fn expected_semicolon(&self) -> String {
         let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row as usize);
-        let padding = &" ".repeat(padding_length + self.column as usize);
+        let padding = &" ".repeat(padding_length + self.column as usize + self.len() - 1);
         format!(
             "{:<4}{}      \n\
              {}{} {}",
