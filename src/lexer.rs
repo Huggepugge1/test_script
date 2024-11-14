@@ -189,20 +189,21 @@ impl<'a> Lexer<'a> {
                 })),
                 '/' => {
                     self.contents.next();
-                    let mut length = 1;
                     if let Some('/') = self.contents.peek() {
                         while let Some(next) = self.contents.next() {
                             if next == '\n' {
                                 break;
                             }
-                            length += 1;
                         }
                     } else {
                         self.tokens.push(self.make_token(TokenType::BinaryOperator {
                             value: "/".to_string(),
                         }));
+                        self.column += 1;
+                        continue;
                     }
-                    self.column += length;
+                    self.column = 1;
+                    self.row += 1;
                     continue;
                 }
                 ':' => self.tokens.push(self.make_token(TokenType::Colon)),

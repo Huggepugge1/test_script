@@ -3,7 +3,6 @@ use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
-use crate::token::Token;
 use crate::variable::Variable;
 
 pub struct TypeChecker {
@@ -57,7 +56,14 @@ impl TypeChecker {
                 let mut result = Type::None;
                 self.environment.add_scope();
                 for instruction in instructions {
-                    result = self.check_instruction(&instruction)?;
+                    result = match self.check_instruction(&instruction) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            e.print();
+                            self.success = false;
+                            Type::None
+                        }
+                    }
                 }
                 self.environment.remove_scope();
                 Ok(result)
@@ -101,7 +107,7 @@ impl TypeChecker {
                 operator,
                 left,
                 right,
-            } => self.check_binary(operator, left, right, &instruction.token),
+            } => self.check_binary(operator, left, right),
 
             InstructionType::TypeCast {
                 instruction,
@@ -132,7 +138,7 @@ impl TypeChecker {
                 } else {
                     Err(ParseError::new(
                         ParseErrorType::MismatchedType {
-                            expected: Type::String,
+                            expected: vec![Type::String],
                             actual: r#type,
                         },
                         instruction.token.clone(),
@@ -146,7 +152,7 @@ impl TypeChecker {
                 } else {
                     Err(ParseError::new(
                         ParseErrorType::MismatchedType {
-                            expected: Type::String,
+                            expected: vec![Type::String],
                             actual: r#type,
                         },
                         instruction.token.clone(),
@@ -160,7 +166,7 @@ impl TypeChecker {
                 } else {
                     Err(ParseError::new(
                         ParseErrorType::MismatchedType {
-                            expected: Type::String,
+                            expected: vec![Type::String],
                             actual: r#type,
                         },
                         instruction.token.clone(),
@@ -174,7 +180,7 @@ impl TypeChecker {
                 } else {
                     Err(ParseError::new(
                         ParseErrorType::MismatchedType {
-                            expected: Type::String,
+                            expected: vec![Type::String],
                             actual: r#type,
                         },
                         instruction.token.clone(),
@@ -196,7 +202,7 @@ impl TypeChecker {
         if variable_type != instruction_type {
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: variable_type,
+                    expected: vec![variable_type],
                     actual: instruction_type,
                 },
                 instruction.token.clone(),
@@ -221,7 +227,7 @@ impl TypeChecker {
                 }
                 _ => Err(ParseError::new(
                     ParseErrorType::MismatchedType {
-                        expected: Type::Regex,
+                        expected: vec![Type::Regex],
                         actual: variable_type,
                     },
                     instruction.token.clone(),
@@ -229,7 +235,7 @@ impl TypeChecker {
             },
             Ok(t) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: Type::Iterable,
+                    expected: vec![Type::Iterable],
                     actual: t,
                 },
                 instruction.token.clone(),
@@ -249,7 +255,7 @@ impl TypeChecker {
                 Type::Bool => Ok(Type::Bool),
                 t => Err(ParseError::new(
                     ParseErrorType::MismatchedType {
-                        expected: Type::Bool,
+                        expected: vec![Type::Bool],
                         actual: t,
                     },
                     instruction.token.clone(),
@@ -259,7 +265,7 @@ impl TypeChecker {
                 Type::Int => Ok(Type::Int),
                 t => Err(ParseError::new(
                     ParseErrorType::MismatchedType {
-                        expected: Type::Int,
+                        expected: vec![Type::Int],
                         actual: t,
                     },
                     instruction.token.clone(),
@@ -273,25 +279,22 @@ impl TypeChecker {
         operator: &BinaryOperator,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
         match operator {
-            BinaryOperator::Addition => self.check_addition(left, right, token),
-            BinaryOperator::Subtraction => self.check_subtraction(left, right, token),
-            BinaryOperator::Multiplication => self.check_multiplication(left, right, token),
-            BinaryOperator::Division => self.check_division(left, right, token),
+            BinaryOperator::Addition => self.check_addition(left, right),
+            BinaryOperator::Subtraction => self.check_subtraction(left, right),
+            BinaryOperator::Multiplication => self.check_multiplication(left, right),
+            BinaryOperator::Division => self.check_division(left, right),
 
-            BinaryOperator::Equal => self.check_comparison(operator, left, right, token),
-            BinaryOperator::NotEqual => self.check_comparison(operator, left, right, token),
-            BinaryOperator::GreaterThan => self.check_comparison(operator, left, right, token),
-            BinaryOperator::GreaterThanOrEqual => {
-                self.check_comparison(operator, left, right, token)
-            }
-            BinaryOperator::LessThan => self.check_comparison(operator, left, right, token),
-            BinaryOperator::LessThanOrEqual => self.check_comparison(operator, left, right, token),
+            BinaryOperator::Equal => self.check_comparison(operator, left, right),
+            BinaryOperator::NotEqual => self.check_comparison(operator, left, right),
+            BinaryOperator::GreaterThan => self.check_comparison(operator, left, right),
+            BinaryOperator::GreaterThanOrEqual => self.check_comparison(operator, left, right),
+            BinaryOperator::LessThan => self.check_comparison(operator, left, right),
+            BinaryOperator::LessThanOrEqual => self.check_comparison(operator, left, right),
 
-            BinaryOperator::And => self.check_logical(left, right, token),
-            BinaryOperator::Or => self.check_logical(left, right, token),
+            BinaryOperator::And => self.check_logical(left, right),
+            BinaryOperator::Or => self.check_logical(left, right),
         }
     }
 
@@ -299,22 +302,33 @@ impl TypeChecker {
         &mut self,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::String, Type::String) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: t1,
-                    actual_left: t1,
-                    expected_right: t1,
-                    actual_right: t2,
+            (Type::String, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::String],
+                    actual: t2,
                 },
-                token.clone(),
+                right.token.clone(),
+            )),
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::String, Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
             )),
         }
     }
@@ -323,21 +337,25 @@ impl TypeChecker {
         &mut self,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::Int, Type::Int) => Ok(Type::Int),
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: Type::Int,
-                    actual_left: t1,
-                    expected_right: Type::Int,
-                    actual_right: t2,
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
                 },
-                token.clone(),
+                right.token.clone(),
+            )),
+            (t1, _) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
             )),
         }
     }
@@ -346,23 +364,33 @@ impl TypeChecker {
         &mut self,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::String, Type::Int) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
-
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: Type::Int,
-                    actual_left: t1,
-                    expected_right: Type::Int,
-                    actual_right: t2,
+            (Type::String, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
                 },
-                token.clone(),
+                right.token.clone(),
+            )),
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
+            (t1, _) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::String, Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
             )),
         }
     }
@@ -371,22 +399,26 @@ impl TypeChecker {
         &mut self,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::Int, Type::Int) => Ok(Type::Int),
-
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: Type::Int,
-                    actual_left: t1,
-                    expected_right: Type::Int,
-                    actual_right: t2,
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
                 },
-                token.clone(),
+                right.token.clone(),
+            )),
+
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
             )),
         }
     }
@@ -396,34 +428,36 @@ impl TypeChecker {
         operator: &BinaryOperator,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::Int, Type::Int) => Ok(Type::Bool),
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
             (Type::String, Type::String) | (Type::Bool, Type::Bool) => match operator {
                 BinaryOperator::Equal | BinaryOperator::NotEqual => Ok(Type::Bool),
                 _ => Err(ParseError::new(
-                    ParseErrorType::MismatchedTypeBinary {
-                        expected_left: Type::Int,
-                        actual_left: Type::Int,
-                        expected_right: Type::Int,
-                        actual_right: Type::Int,
+                    ParseErrorType::MismatchedType {
+                        expected: vec![Type::Int],
+                        actual: Type::Int,
                     },
-                    token.clone(),
+                    left.token.clone(),
                 )),
             },
 
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: t1,
-                    actual_left: t1,
-                    expected_right: t1,
-                    actual_right: t2,
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![t1],
+                    actual: t1,
                 },
-                token.clone(),
+                left.token.clone(),
             )),
         }
     }
@@ -432,22 +466,19 @@ impl TypeChecker {
         &mut self,
         left: &Instruction,
         right: &Instruction,
-        token: &Token,
     ) -> Result<Type, ParseError> {
-        let left = self.check_instruction(left)?;
-        let right = self.check_instruction(right)?;
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
 
-        match (left, right) {
+        match (left_type, right_type) {
             (Type::Bool, Type::Bool) => Ok(Type::Bool),
 
-            (t1, t2) => Err(ParseError::new(
-                ParseErrorType::MismatchedTypeBinary {
-                    expected_left: Type::Bool,
-                    actual_left: t1,
-                    expected_right: Type::Bool,
-                    actual_right: t2,
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Bool],
+                    actual: t1,
                 },
-                token.clone(),
+                left.token.clone(),
             )),
         }
     }
@@ -485,7 +516,7 @@ impl TypeChecker {
         if condition_type != Type::Bool {
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: Type::Bool,
+                    expected: vec![Type::Bool],
                     actual: condition_type,
                 },
                 condition.token.clone(),
@@ -498,7 +529,7 @@ impl TypeChecker {
         } else {
             Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: result,
+                    expected: vec![result],
                     actual: result_else,
                 },
                 instruction.token.clone(),

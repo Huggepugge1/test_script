@@ -9,18 +9,11 @@ pub enum ParseErrorType {
     UnexpectedToken(TokenType),
 
     UnexpectedEndOfFile,
-
     UnclosedDelimiter(TokenType),
 
     MismatchedType {
-        expected: Type,
+        expected: Vec<Type>,
         actual: Type,
-    },
-    MismatchedTypeBinary {
-        expected_left: Type,
-        actual_left: Type,
-        expected_right: Type,
-        actual_right: Type,
     },
     MismatchedTokenType {
         expected: TokenType,
@@ -52,30 +45,28 @@ impl std::fmt::Display for ParseErrorType {
             }
 
             ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
-
             ParseErrorType::UnclosedDelimiter(token) => {
                 write!(f, "Unclosed delimiter: {}", token)
             }
 
-            ParseErrorType::MismatchedType { expected, actual } => {
-                write!(
+            ParseErrorType::MismatchedType { expected, actual } => match expected.len() {
+                1 => write!(
                     f,
-                    "Mismatched type: Expected `{}`, got `{}`",
-                    expected, actual
-                )
-            }
-            ParseErrorType::MismatchedTypeBinary {
-                expected_left,
-                actual_left,
-                expected_right,
-                actual_right,
-            } => {
-                write!(
+                    "Type error: Expected `{}`, found `{}`",
+                    expected[0], actual
+                ),
+                _ => write!(
                     f,
-                    "Mismatched types: Expected `{}` and `{}`, got `{}` and `{}`",
-                    expected_left, expected_right, actual_left, actual_right
-                )
-            }
+                    "Type error: Expected one of {}, found `{}`",
+                    expected
+                        .into_iter()
+                        .map(|r#type| format!("`{type}`"))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    actual
+                ),
+            },
+
             ParseErrorType::MismatchedTokenType { expected, actual } => {
                 write!(
                     f,
