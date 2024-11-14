@@ -110,9 +110,9 @@ impl TypeChecker {
             } => self.check_binary(operator, left, right),
 
             InstructionType::TypeCast {
-                instruction,
+                instruction: left_instruction,
                 r#type,
-            } => self.check_type_cast(instruction, r#type),
+            } => self.check_type_cast(left_instruction, instruction, r#type),
 
             InstructionType::None => {
                 ParseWarning::new(
@@ -485,10 +485,11 @@ impl TypeChecker {
 
     fn check_type_cast(
         &mut self,
+        left_instruction: &Instruction,
         instruction: &Instruction,
         r#type: &Type,
     ) -> Result<Type, ParseError> {
-        let instruction_type = self.check_instruction(instruction)?;
+        let instruction_type = self.check_instruction(left_instruction)?;
         match (instruction_type, r#type) {
             (Type::String, Type::Int) => Ok(Type::Int),
             (Type::Int, Type::String) => Ok(Type::String),
