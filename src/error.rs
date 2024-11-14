@@ -75,7 +75,7 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "Cannot cast `{from}` to `{to}`")
             }
 
-            ParseErrorType::RegexError => write!(f, "Regex error"),
+            ParseErrorType::RegexError => write!(f, "Regex syntax not supported"),
 
             ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
             ParseErrorType::ConstantReassignment(constant) => {

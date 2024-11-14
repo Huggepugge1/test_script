@@ -290,7 +290,7 @@ impl Parser {
         let token = self.get_next_token()?;
         match &token.r#type {
             TokenType::RegexLiteral { value: _value } => Ok(Instruction::new(
-                InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size).unwrap()),
+                InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
                 token,
             )),
             _ => unreachable!(),
@@ -393,8 +393,16 @@ impl Parser {
                 ));
             }
         }
-        let instruction = self.parse_expression(true, true)?;
+
         let variable = Variable::new(identifier_name.clone(), r#const, r#type.clone());
+
+        let instruction = match self.parse_expression(true, true) {
+            Ok(instruction) => instruction,
+            Err(e) => {
+                self.environment.insert(variable.clone());
+                return Err(e);
+            }
+        };
         match &assignment.r#type {
             TokenType::AssignmentOperator => {
                 self.environment.insert(variable.clone());
@@ -605,27 +613,26 @@ impl Parser {
 
         self.environment.add_scope();
 
-        let assignment = self.parse_declaration();
-
-        let statement = self.parse_statement();
-        self.environment.remove_scope();
-
-        let statement = match statement {
-            Ok(statement) => statement,
+        let assignment = match self.parse_declaration() {
+            Ok(instruction) => instruction,
             Err(e) => {
-                return Err(e);
+                e.print();
+                self.success = false;
+                Instruction::NONE
             }
         };
 
-        self.tokens.back();
+        let statement = self.parse_statement();
 
-        match assignment {
-            Ok(assignment) => Ok(Instruction::new(
-                InstructionType::For(Box::new(assignment), Box::new(statement)),
-                token,
-            )),
-            Err(_) => Err(ParseError::none()),
-        }
+        self.environment.remove_scope();
+
+        let statement = statement?;
+
+        self.tokens.back();
+        Ok(Instruction::new(
+            InstructionType::For(Box::new(assignment), Box::new(statement)),
+            token,
+        ))
     }
 
     fn parse_parentheses(&mut self) -> Result<Instruction, ParseError> {
