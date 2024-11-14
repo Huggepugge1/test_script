@@ -68,14 +68,11 @@ impl std::fmt::Display for ParseErrorType {
             },
 
             ParseErrorType::MismatchedTokenType { expected, actual } => {
-                write!(
-                    f,
-                    "Mismatched token type: Expected {expected}, got {actual}",
-                )
+                write!(f, "Expected {expected}, found {actual}")
             }
 
             ParseErrorType::TypeCast { from, to } => {
-                write!(f, "Type cast error: Cannot cast {} to {}", from, to)
+                write!(f, "Cannot cast `{from}` to `{to}`")
             }
 
             ParseErrorType::RegexError => write!(f, "Regex error"),
