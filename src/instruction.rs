@@ -181,10 +181,12 @@ impl Instruction {
         r#type: InstructionType::None,
         token: Token {
             r#type: TokenType::None,
-            value: String::new(),
+            file: String::new(),
             row: 0,
             column: 0,
+
             line: String::new(),
+            last_token: None,
         },
     };
 

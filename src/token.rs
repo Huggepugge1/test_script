@@ -1,19 +1,25 @@
+use crate::r#type::Type;
 use colored::Colorize;
+
+pub enum PrintStyle {
+    Warning,
+    Error,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
-    StringLiteral,
-    RegexLiteral,
-    IntegerLiteral,
-    BooleanLiteral,
+    StringLiteral { value: String },
+    RegexLiteral { value: String },
+    IntegerLiteral { value: i64 },
+    BooleanLiteral { value: bool },
 
-    Keyword,
-    BuiltIn,
+    Keyword { value: String },
+    BuiltIn { value: String },
 
-    Type,
+    Type { value: Type },
     Colon,
 
-    Identifier,
+    Identifier { value: String },
 
     OpenBlock,
     CloseBlock,
@@ -23,9 +29,10 @@ pub enum TokenType {
 
     TypeCast,
     AssignmentOperator,
+    IterableAssignmentOperator,
 
-    UnaryOperator,
-    BinaryOperator,
+    UnaryOperator { value: String },
+    BinaryOperator { value: String },
 
     Semicolon,
 
@@ -35,31 +42,32 @@ pub enum TokenType {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TokenType::StringLiteral => write!(f, "String literal"),
-            TokenType::RegexLiteral => write!(f, "Regex literal"),
-            TokenType::IntegerLiteral => write!(f, "Integer literal"),
-            TokenType::BooleanLiteral => write!(f, "Boolean literal"),
+            TokenType::StringLiteral { value } => write!(f, "{value}"),
+            TokenType::RegexLiteral { value } => write!(f, "{value}"),
+            TokenType::IntegerLiteral { value } => write!(f, "`{value}`"),
+            TokenType::BooleanLiteral { value } => write!(f, "`{value}`"),
 
-            TokenType::Keyword => write!(f, "Keyword"),
-            TokenType::BuiltIn => write!(f, "BuiltIn"),
+            TokenType::Keyword { value } => write!(f, "keyword `{value}`"),
+            TokenType::BuiltIn { value } => write!(f, "built-in `{value}`"),
 
-            TokenType::Type => write!(f, "Type"),
-            TokenType::Colon => write!(f, "Colon"),
+            TokenType::Type { value } => write!(f, "type `{value}`"),
+            TokenType::Colon => write!(f, ":"),
 
-            TokenType::Identifier => write!(f, "Identifier"),
+            TokenType::Identifier { value } => write!(f, "identifier `{value}`"),
 
-            TokenType::OpenBlock => write!(f, "OpenBlock"),
-            TokenType::CloseBlock => write!(f, "CloseBlock"),
-            TokenType::OpenParen => write!(f, "OpenParen"),
-            TokenType::CloseParen => write!(f, "CloseParen"),
+            TokenType::OpenBlock => write!(f, "{{"),
+            TokenType::CloseBlock => write!(f, "}}"),
+            TokenType::OpenParen => write!(f, "("),
+            TokenType::CloseParen => write!(f, ")"),
 
-            TokenType::TypeCast => write!(f, "Type cast"),
-            TokenType::AssignmentOperator => write!(f, "Assignment operator"),
+            TokenType::TypeCast => write!(f, "Keyword `as`"),
+            TokenType::AssignmentOperator => write!(f, "="),
+            TokenType::IterableAssignmentOperator => write!(f, "keyword `in`"),
 
-            TokenType::UnaryOperator => write!(f, "Unary operator"),
-            TokenType::BinaryOperator => write!(f, "Binary operator"),
+            TokenType::UnaryOperator { value } => write!(f, "unary operator `{value}`"),
+            TokenType::BinaryOperator { value } => write!(f, "binary operator `{value}`"),
 
-            TokenType::Semicolon => write!(f, "Semicolon"),
+            TokenType::Semicolon => write!(f, "`;`"),
 
             TokenType::None => write!(f, ""),
         }
@@ -69,37 +77,77 @@ impl std::fmt::Display for TokenType {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub r#type: TokenType,
-    pub value: String,
+    pub file: String,
     pub row: u32,
     pub column: u32,
 
     pub line: String,
+    pub last_token: Option<Box<Token>>,
 }
 
 impl Token {
-    pub fn none() -> Token {
-        Token {
+    pub fn none() -> Self {
+        Self {
             r#type: TokenType::None,
-            value: String::new(),
+            file: String::new(),
             row: 0,
             column: 0,
+
             line: String::new(),
+            last_token: None,
         }
     }
 
     pub fn binary_operator(&self) -> bool {
-        self.r#type == TokenType::BinaryOperator
-            || self.r#type == TokenType::AssignmentOperator
-            || self.r#type == TokenType::TypeCast
+        match &self.r#type {
+            TokenType::BinaryOperator { .. }
+            | TokenType::AssignmentOperator
+            | TokenType::TypeCast => true,
+            _ => false,
+        }
     }
-}
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let padding = &" ".repeat(7 + self.column as usize);
-        write!(
-            f,
-            "{:<8}{}\n\
+    pub fn len(&self) -> usize {
+        match &self.r#type {
+            TokenType::StringLiteral { value } => value.len(),
+            TokenType::RegexLiteral { value } => value.len(),
+            TokenType::IntegerLiteral { value } => value.to_string().len(),
+            TokenType::BooleanLiteral { value } => value.to_string().len(),
+
+            TokenType::Keyword { value } => value.len(),
+            TokenType::BuiltIn { value } => value.len(),
+
+            TokenType::Type { value } => value.to_string().len(),
+            TokenType::Colon => 1,
+
+            TokenType::Identifier { value } => value.len(),
+
+            TokenType::OpenBlock => 1,
+            TokenType::CloseBlock => 1,
+
+            TokenType::OpenParen => 1,
+            TokenType::CloseParen => 1,
+
+            TokenType::TypeCast => 2,
+            TokenType::AssignmentOperator => 1,
+            TokenType::IterableAssignmentOperator => 2,
+
+            TokenType::UnaryOperator { value } => value.len(),
+            TokenType::BinaryOperator { value } => value.len(),
+
+            TokenType::Semicolon => 1,
+
+            TokenType::None => 0,
+        }
+    }
+
+    const LINE_NUMBER_PADDING: usize = 4;
+
+    pub fn as_string(&self, style: PrintStyle) -> String {
+        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row as usize);
+        let padding = &" ".repeat(padding_length + self.column as usize - 1);
+        format!(
+            "{:<4}{}      \n\
              {}{}",
             self.row.to_string().color(colored::Color::TrueColor {
                 r: 0x9F,
@@ -108,7 +156,28 @@ impl std::fmt::Display for Token {
             }),
             self.line,
             padding,
-            "^".repeat(self.value.len()),
+            match style {
+                PrintStyle::Warning => "^".repeat(self.len()).bright_yellow().to_string(),
+                PrintStyle::Error => "^".repeat(self.len()).bright_red().to_string(),
+            }
+        )
+    }
+
+    pub fn expected_semicolon(&self) -> String {
+        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row as usize);
+        let padding = &" ".repeat(padding_length + self.column as usize);
+        format!(
+            "{:<4}{}      \n\
+             {}{} {}",
+            self.row.to_string().color(colored::Color::TrueColor {
+                r: 0x9F,
+                g: 0xFE,
+                b: 0xBF,
+            }),
+            self.line,
+            padding,
+            "^".bright_blue(),
+            "add a semicolon here".bright_blue()
         )
     }
 }

@@ -136,7 +136,6 @@ impl TypeChecker {
                             actual: r#type,
                         },
                         instruction.token.clone(),
-                        "Expected a string",
                     ))
                 }
             }
@@ -151,7 +150,6 @@ impl TypeChecker {
                             actual: r#type,
                         },
                         instruction.token.clone(),
-                        "Expected a None",
                     ))
                 }
             }
@@ -166,7 +164,6 @@ impl TypeChecker {
                             actual: r#type,
                         },
                         instruction.token.clone(),
-                        "Expected a string",
                     ))
                 }
             }
@@ -181,7 +178,6 @@ impl TypeChecker {
                             actual: r#type,
                         },
                         instruction.token.clone(),
-                        "Expected a string",
                     ))
                 }
             }
@@ -193,19 +189,17 @@ impl TypeChecker {
         variable: &Variable,
         instruction: &Instruction,
     ) -> Result<Type, ParseError> {
-        let variable_name = &variable.name;
         let variable_type = variable.r#type;
 
         let instruction_type = self.check_instruction(&instruction.clone())?;
 
         if variable_type != instruction_type {
             return Err(ParseError::new(
-                ParseErrorType::MismatchedType{expected: variable_type, actual: instruction_type},
+                ParseErrorType::MismatchedType {
+                    expected: variable_type,
+                    actual: instruction_type,
+                },
                 instruction.token.clone(),
-                format!(
-                    "Expected expression of type {:?} because of \"{variable_name}\" type but found {:?}",
-                    variable_type, instruction_type
-                ),
             ));
         }
 
@@ -226,18 +220,19 @@ impl TypeChecker {
                     Ok(variable_type)
                 }
                 _ => Err(ParseError::new(
-                ParseErrorType::MismatchedType{expected: Type::Regex, actual: variable_type},
+                    ParseErrorType::MismatchedType {
+                        expected: Type::Regex,
+                        actual: variable_type,
+                    },
                     instruction.token.clone(),
-                    format!(
-                        "Expected expression of type {:?} because of the variable type but found {:?}",
-                        variable_type, instruction.r#type
-                    ),
                 )),
             },
             Ok(t) => Err(ParseError::new(
-                ParseErrorType::MismatchedType{expected: Type::Iterable, actual: t},
+                ParseErrorType::MismatchedType {
+                    expected: Type::Iterable,
+                    actual: t,
+                },
                 instruction.token.clone(),
-                format!("Expected an iterable type but found a {t:?}"),
             )),
             Err(e) => Err(e),
         }
@@ -258,7 +253,6 @@ impl TypeChecker {
                         actual: t,
                     },
                     instruction.token.clone(),
-                    format!("Expected a boolean but found a {t:?}"),
                 )),
             },
             UnaryOperator::Negation => match instruction_type {
@@ -269,7 +263,6 @@ impl TypeChecker {
                         actual: t,
                     },
                     instruction.token.clone(),
-                    format!("Expected an integer but found a {t:?}"),
                 )),
             },
         }
@@ -288,12 +281,14 @@ impl TypeChecker {
             BinaryOperator::Multiplication => self.check_multiplication(left, right, token),
             BinaryOperator::Division => self.check_division(left, right, token),
 
-            BinaryOperator::Equal => self.check_comparison(left, right, token),
-            BinaryOperator::NotEqual => self.check_comparison(left, right, token),
-            BinaryOperator::GreaterThan => self.check_comparison(left, right, token),
-            BinaryOperator::GreaterThanOrEqual => self.check_comparison(left, right, token),
-            BinaryOperator::LessThan => self.check_comparison(left, right, token),
-            BinaryOperator::LessThanOrEqual => self.check_comparison(left, right, token),
+            BinaryOperator::Equal => self.check_comparison(operator, left, right, token),
+            BinaryOperator::NotEqual => self.check_comparison(operator, left, right, token),
+            BinaryOperator::GreaterThan => self.check_comparison(operator, left, right, token),
+            BinaryOperator::GreaterThanOrEqual => {
+                self.check_comparison(operator, left, right, token)
+            }
+            BinaryOperator::LessThan => self.check_comparison(operator, left, right, token),
+            BinaryOperator::LessThanOrEqual => self.check_comparison(operator, left, right, token),
 
             BinaryOperator::And => self.check_logical(left, right, token),
             BinaryOperator::Or => self.check_logical(left, right, token),
@@ -320,7 +315,6 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!("Addition is not supported between `{}` and `{}`", t1, t2),
             )),
         }
     }
@@ -344,7 +338,6 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!("Subtraction is not supported between `{}` and `{}`", t1, t2),
             )),
         }
     }
@@ -370,10 +363,6 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!(
-                    "Multiplication is not supported between `{}` and `{}`",
-                    t1, t2
-                ),
             )),
         }
     }
@@ -398,16 +387,13 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!(
-                    "Multiplication is not supported between `{}` and `{}`",
-                    t1, t2
-                ),
             )),
         }
     }
 
     fn check_comparison(
         &mut self,
+        operator: &BinaryOperator,
         left: &Instruction,
         right: &Instruction,
         token: &Token,
@@ -417,8 +403,8 @@ impl TypeChecker {
 
         match (left, right) {
             (Type::Int, Type::Int) => Ok(Type::Bool),
-            (Type::String, Type::String) | (Type::Bool, Type::Bool) => match token.value.as_str() {
-                "==" | "!=" => Ok(Type::Bool),
+            (Type::String, Type::String) | (Type::Bool, Type::Bool) => match operator {
+                BinaryOperator::Equal | BinaryOperator::NotEqual => Ok(Type::Bool),
                 _ => Err(ParseError::new(
                     ParseErrorType::MismatchedTypeBinary {
                         expected_left: Type::Int,
@@ -427,10 +413,6 @@ impl TypeChecker {
                         actual_right: Type::Int,
                     },
                     token.clone(),
-                    format!(
-                        "Comparison is not supported between `{}` and `{}`",
-                        left, right
-                    ),
                 )),
             },
 
@@ -442,7 +424,6 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!("Comparison is not supported between `{}` and `{}`", t1, t2),
             )),
         }
     }
@@ -467,10 +448,6 @@ impl TypeChecker {
                     actual_right: t2,
                 },
                 token.clone(),
-                format!(
-                    "Logical operation is not supported between `{}` and `{}`",
-                    t1, t2
-                ),
             )),
         }
     }
@@ -494,7 +471,6 @@ impl TypeChecker {
                     to: *r#type,
                 },
                 instruction.token.clone(),
-                format!("Cannot cast {instruction_type} to {}", r#type),
             )),
         }
     }
@@ -513,7 +489,6 @@ impl TypeChecker {
                     actual: condition_type,
                 },
                 condition.token.clone(),
-                "Only booleans are allowed in conditions",
             ));
         }
         let result = self.check_instruction(&instruction)?;
@@ -527,7 +502,6 @@ impl TypeChecker {
                     actual: result_else,
                 },
                 instruction.token.clone(),
-                "Conditional return two types that don't match",
             ))
         }
     }

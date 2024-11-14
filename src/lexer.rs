@@ -1,52 +1,78 @@
+use crate::cli::Args;
+use crate::r#type::Type;
 use crate::token::{Token, TokenCollection, TokenType};
+
+use std::path::PathBuf;
 
 pub struct Lexer<'a> {
     lines: Vec<String>,
     contents: std::iter::Peekable<std::str::Chars<'a>>,
+    file: PathBuf,
+    tokens: Vec<Token>,
 
     row: u32,
     column: u32,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(contents: &'a mut String) -> Lexer<'a> {
+    pub fn new(contents: &'a mut String, args: Args) -> Lexer<'a> {
         let lines = contents.lines().map(|s| s.to_string()).collect();
         let contents = contents.chars().peekable().to_owned().clone();
 
         let row = 1;
         let column = 1;
 
+        let tokens = Vec::new();
+
         Lexer {
             lines,
             contents,
+            file: args.file,
+            tokens,
+
             row,
             column,
         }
     }
 
-    fn make_token(&self, r#type: TokenType, value: &str) -> Token {
+    fn make_token(&self, r#type: TokenType) -> Token {
         Token {
             r#type,
-            value: value.to_string(),
+            file: self.file.to_str().unwrap().to_string(),
             row: self.row,
             column: self.column,
-            line: self.get_line(self.row),
+
+            line: self.get_line(),
+            last_token: match self.tokens.last() {
+                Some(token) => Some(Box::new(token.clone())),
+                None => None,
+            },
         }
     }
 
-    fn get_line(&self, line: u32) -> String {
-        self.lines[line as usize - 1].clone()
+    fn get_line(&self) -> String {
+        self.lines[self.row as usize - 1].clone()
     }
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
-            "for" | "let" | "const" | "if" | "else" => TokenType::Keyword,
-            "string" | "regex" | "int" | "bool" => TokenType::Type,
-            "true" | "false" => TokenType::BooleanLiteral,
-            "in" => TokenType::AssignmentOperator,
+            "for" | "let" | "const" | "if" | "else" => TokenType::Keyword {
+                value: value.to_string(),
+            },
+            "string" | "regex" | "int" | "bool" => TokenType::Type {
+                value: Type::from(value),
+            },
+            "true" | "false" => TokenType::BooleanLiteral {
+                value: value.parse::<bool>().unwrap(),
+            },
+            "in" => TokenType::IterableAssignmentOperator,
             "as" => TokenType::TypeCast,
-            "input" | "output" | "print" | "println" => TokenType::BuiltIn,
-            _ => TokenType::Identifier,
+            "input" | "output" | "print" | "println" => TokenType::BuiltIn {
+                value: value.to_string(),
+            },
+            _ => TokenType::Identifier {
+                value: value.to_string(),
+            },
         }
     }
 
@@ -64,7 +90,7 @@ impl<'a> Lexer<'a> {
         }
 
         let token_type = self.identifier_type(&current);
-        let token = self.make_token(token_type, &current);
+        let token = self.make_token(token_type);
         self.column += length;
         token
     }
@@ -91,7 +117,7 @@ impl<'a> Lexer<'a> {
 
         self.contents.next();
 
-        let token = self.make_token(TokenType::StringLiteral, &current);
+        let token = self.make_token(TokenType::StringLiteral { value: current });
         self.row = new_row;
         self.column = new_column;
         token
@@ -119,7 +145,7 @@ impl<'a> Lexer<'a> {
 
         self.contents.next();
 
-        let token = self.make_token(TokenType::RegexLiteral, &current);
+        let token = self.make_token(TokenType::RegexLiteral { value: current });
         self.row = new_row;
         self.column = new_column;
         token
@@ -137,24 +163,30 @@ impl<'a> Lexer<'a> {
             length += 1;
         }
 
-        let token = self.make_token(TokenType::IntegerLiteral, &current);
+        let token = self.make_token(TokenType::IntegerLiteral {
+            value: current.parse::<i64>().unwrap(),
+        });
         self.column += length;
         token
     }
 
     pub fn tokenize(&mut self) -> TokenCollection {
-        let mut tokens: Vec<Token> = Vec::new();
-
         while let Some(c) = self.contents.peek() {
             match c {
-                '{' => tokens.push(self.make_token(TokenType::OpenBlock, &"{")),
-                '}' => tokens.push(self.make_token(TokenType::CloseBlock, &"}")),
-                '(' => tokens.push(self.make_token(TokenType::OpenParen, &"(")),
-                ')' => tokens.push(self.make_token(TokenType::CloseParen, &")")),
-                ';' => tokens.push(self.make_token(TokenType::Semicolon, &";")),
-                '+' => tokens.push(self.make_token(TokenType::BinaryOperator, &"+")),
-                '-' => tokens.push(self.make_token(TokenType::BinaryOperator, &"-")),
-                '*' => tokens.push(self.make_token(TokenType::BinaryOperator, &"*")),
+                '{' => self.tokens.push(self.make_token(TokenType::OpenBlock)),
+                '}' => self.tokens.push(self.make_token(TokenType::CloseBlock)),
+                '(' => self.tokens.push(self.make_token(TokenType::OpenParen)),
+                ')' => self.tokens.push(self.make_token(TokenType::CloseParen)),
+                ';' => self.tokens.push(self.make_token(TokenType::Semicolon)),
+                '+' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "+".to_string(),
+                })),
+                '-' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "-".to_string(),
+                })),
+                '*' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "*".to_string(),
+                })),
                 '/' => {
                     self.contents.next();
                     let mut length = 1;
@@ -166,21 +198,27 @@ impl<'a> Lexer<'a> {
                             length += 1;
                         }
                     } else {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"/"));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "/".to_string(),
+                        }));
                     }
                     self.column += length;
                     continue;
                 }
-                ':' => tokens.push(self.make_token(TokenType::Colon, &":")),
+                ':' => self.tokens.push(self.make_token(TokenType::Colon)),
                 '<' => {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('=') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"<="));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "<=".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"<"));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "<".to_string(),
+                        }));
                     }
                     self.column += length;
                     continue;
@@ -189,11 +227,15 @@ impl<'a> Lexer<'a> {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('=') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &">="));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: ">=".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &">"));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: ">".to_string(),
+                        }));
                     }
                     self.column += length;
                 }
@@ -201,11 +243,14 @@ impl<'a> Lexer<'a> {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('=') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"=="));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "==".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
-                        tokens.push(self.make_token(TokenType::AssignmentOperator, &"="));
+                        self.tokens
+                            .push(self.make_token(TokenType::AssignmentOperator));
                     }
                     self.column += length;
                     continue;
@@ -214,11 +259,15 @@ impl<'a> Lexer<'a> {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('=') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"!="));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "!=".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
-                        tokens.push(self.make_token(TokenType::UnaryOperator, &"!"));
+                        self.tokens.push(self.make_token(TokenType::UnaryOperator {
+                            value: "!".to_string(),
+                        }));
                     }
                     self.column += length;
                     continue;
@@ -227,7 +276,9 @@ impl<'a> Lexer<'a> {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('&') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"&&"));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "&&".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
@@ -240,7 +291,9 @@ impl<'a> Lexer<'a> {
                     self.contents.next();
                     let mut length = 1;
                     if let Some('|') = self.contents.peek() {
-                        tokens.push(self.make_token(TokenType::BinaryOperator, &"||"));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "||".to_string(),
+                        }));
                         length += 1;
                         self.contents.next();
                     } else {
@@ -250,19 +303,23 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
-                    tokens.push(self.tokenize_identifier());
+                    let token = self.tokenize_identifier();
+                    self.tokens.push(token);
                     continue;
                 }
                 '"' => {
-                    tokens.push(self.tokenize_string_literal());
+                    let token = self.tokenize_string_literal();
+                    self.tokens.push(token);
                     continue;
                 }
                 '`' => {
-                    tokens.push(self.tokenize_regex_literal());
+                    let token = self.tokenize_regex_literal();
+                    self.tokens.push(token);
                     continue;
                 }
                 '0'..='9' => {
-                    tokens.push(self.tokenize_integer_literal());
+                    let token = self.tokenize_integer_literal();
+                    self.tokens.push(token);
                     continue;
                 }
                 '\n' => {
@@ -278,6 +335,6 @@ impl<'a> Lexer<'a> {
             self.contents.next();
         }
 
-        TokenCollection::new(tokens)
+        TokenCollection::new(self.tokens.clone())
     }
 }

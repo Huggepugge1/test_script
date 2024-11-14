@@ -7,6 +7,8 @@ pub enum Type {
     None,
 
     Iterable,
+
+    Any,
 }
 
 impl Type {
@@ -31,6 +33,8 @@ impl std::fmt::Display for Type {
             Type::None => write!(f, "()"),
 
             Type::Iterable => write!(f, "Iterable"),
+
+            Type::Any => write!(f, "Any"),
         }
     }
 }

@@ -1,12 +1,16 @@
 use crate::interpreter::InstructionResult;
 use crate::r#type::Type;
-use crate::token::{Token, TokenType};
+use crate::token::{PrintStyle, Token, TokenType};
 
 use colored::Colorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
-    UnexpectedToken,
+    UnexpectedToken {
+        expected: TokenType,
+        actual: TokenType,
+    },
+
     UnexpectedEndOfFile,
 
     MismatchedType {
@@ -41,7 +45,10 @@ pub enum ParseErrorType {
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::UnexpectedToken => write!(f, "Unexpected token"),
+            ParseErrorType::UnexpectedToken { expected, actual } => {
+                write!(f, "expected {expected}, found {actual}")
+            }
+
             ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
 
             ParseErrorType::MismatchedType { expected, actual } => {
@@ -89,23 +96,17 @@ impl std::fmt::Display for ParseErrorType {
 pub struct ParseError {
     pub r#type: ParseErrorType,
     token: Token,
-    hint: String,
 }
 
 impl ParseError {
-    pub fn new(r#type: ParseErrorType, token: Token, hint: impl Into<String>) -> ParseError {
-        ParseError {
-            r#type,
-            token,
-            hint: hint.into(),
-        }
+    pub fn new(r#type: ParseErrorType, token: Token) -> ParseError {
+        ParseError { r#type, token }
     }
 
     pub fn none() -> ParseError {
         ParseError {
             r#type: ParseErrorType::None,
             token: Token::none(),
-            hint: String::new(),
         }
     }
 
@@ -113,17 +114,54 @@ impl ParseError {
         if self.r#type == ParseErrorType::None {
             return;
         }
-        eprintln!(
-            "{}{}              \n\
-                               \n\
-             {}                \n\
-                               \n\
-             hint: {}          \n",
-            "error: ".bright_red(),
-            self.r#type,
-            self.token,
-            self.hint
-        );
+
+        match &self.r#type {
+            ParseErrorType::UnexpectedToken {
+                expected: TokenType::Semicolon,
+                actual: _actual,
+            } => match &self.token.last_token {
+                Some(last_token) => {
+                    eprintln!(
+                        "{}{}              \n\
+                         In: {}:{}:{}      \n\
+                         {}                \n\
+                                           \n\
+                         {}                \n",
+                        "error: ".bright_red(),
+                        self.r#type,
+                        self.token.file,
+                        self.token.row,
+                        self.token.column,
+                        last_token.expected_semicolon(),
+                        self.token.as_string(PrintStyle::Error),
+                    )
+                }
+                None => {
+                    eprintln!(
+                        "{}{}              \n\
+                         In: {}:{}:{}      \n\
+                         {}                \n",
+                        "error: ".bright_red(),
+                        self.r#type,
+                        self.token.file,
+                        self.token.row,
+                        self.token.column,
+                        self.token.as_string(PrintStyle::Error),
+                    )
+                }
+            },
+            _ => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Error),
+            ),
+        }
     }
 }
 
@@ -166,7 +204,7 @@ impl ParseWarning {
              hint: {}          \n",
             "warning: ".bright_yellow(),
             self.r#type,
-            self.token,
+            self.token.as_string(PrintStyle::Warning),
             self.hint
         );
     }
