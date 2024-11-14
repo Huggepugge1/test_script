@@ -94,7 +94,9 @@ Note: The star operation repeats `0-max_len` inclusive times.
 `\`regular expression\``<br>
 
 #### Example
-`\`\\d\`` would create an iterable containg all digits 0-9.
+```
+`\\d`
+``` would create an iterable containg all digits 0-9.
 
 ## Operators
 ### Assignment
