@@ -433,7 +433,7 @@ impl Parser {
         if variable.r#const {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::VariableIsConstant,
+                ParseErrorType::ConstantReassignment(variable.name.clone()),
                 instruction.token.clone(),
             ));
         }
@@ -551,6 +551,7 @@ impl Parser {
                 }
             }
         }
+
         self.environment.remove_scope();
         Ok(Instruction::new(InstructionType::Block(block), token))
     }

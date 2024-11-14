@@ -35,7 +35,7 @@ pub enum ParseErrorType {
     RegexError,
 
     VariableNotDefined,
-    VariableIsConstant,
+    ConstantReassignment(String),
 
     TestError,
 
@@ -90,7 +90,9 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::RegexError => write!(f, "Regex error"),
 
             ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
-            ParseErrorType::VariableIsConstant => write!(f, "Variable is constant"),
+            ParseErrorType::ConstantReassignment(constant) => {
+                write!(f, "Cannot reassign constant `{constant}`")
+            }
 
             ParseErrorType::TestError => write!(f, "Test error"),
 
