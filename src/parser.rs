@@ -6,6 +6,7 @@ use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
 use crate::variable::Variable;
+use crate::white_listed_constants::WHITE_LISTED_CONSTANTS;
 
 use convert_case::{Case, Casing};
 
@@ -13,6 +14,7 @@ pub struct Parser {
     tokens: TokenCollection,
     environment: ParseEnvironment,
     args: Args,
+    in_constant_declaration: bool,
     success: bool,
 }
 
@@ -22,6 +24,7 @@ impl Parser {
             tokens,
             environment: ParseEnvironment::new(args.clone()),
             args,
+            in_constant_declaration: false,
             success: true,
         };
     }
@@ -140,11 +143,13 @@ impl Parser {
             _ => unreachable!(),
         };
         self.expect_token(TokenType::OpenParen)?;
+        self.in_constant_declaration = true;
         let path = self.parse_string_literal()?;
         let path = match path.r#type {
             InstructionType::StringLiteral(path) => path,
             _ => unreachable!(),
         };
+        self.in_constant_declaration = false;
         self.expect_token(TokenType::CloseParen)?;
         let instruction = self.parse_statement()?;
 
@@ -158,10 +163,24 @@ impl Parser {
         let token = self.get_next_token()?;
 
         match &token.r#type {
-            TokenType::StringLiteral { value } => Ok(Instruction::new(
-                InstructionType::StringLiteral(value.to_string()[1..value.len() - 1].to_string()),
-                token,
-            )),
+            TokenType::StringLiteral { value } => {
+                if !self.args.disable_magic_warnings
+                    && !self.in_constant_declaration
+                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                {
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                            .print(self.args.disable_warnings)
+                    }
+                }
+
+                Ok(Instruction::new(
+                    InstructionType::StringLiteral(
+                        value.to_string()[1..value.len() - 1].to_string(),
+                    ),
+                    token,
+                ))
+            }
             _ => unreachable!(),
         }
     }
@@ -297,10 +316,21 @@ impl Parser {
     fn parse_regex_literal(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         match &token.r#type {
-            TokenType::RegexLiteral { value: _value } => Ok(Instruction::new(
-                InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
-                token,
-            )),
+            TokenType::RegexLiteral { value } => {
+                if !self.args.disable_magic_warnings
+                    && !self.in_constant_declaration
+                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                {
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                            .print(self.args.disable_warnings)
+                    }
+                }
+                Ok(Instruction::new(
+                    InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
+                    token,
+                ))
+            }
             _ => unreachable!(),
         }
     }
@@ -308,10 +338,21 @@ impl Parser {
     fn parse_integer_literal(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         match token.r#type {
-            TokenType::IntegerLiteral { value } => Ok(Instruction::new(
-                InstructionType::IntegerLiteral(value),
-                token,
-            )),
+            TokenType::IntegerLiteral { value } => {
+                if !self.args.disable_magic_warnings
+                    && !self.in_constant_declaration
+                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                {
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                            .print(self.args.disable_warnings)
+                    }
+                }
+                Ok(Instruction::new(
+                    InstructionType::IntegerLiteral(value),
+                    token,
+                ))
+            }
             _ => unreachable!(),
         }
     }
@@ -319,10 +360,21 @@ impl Parser {
     fn parse_boolean_literal(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         match token.r#type {
-            TokenType::BooleanLiteral { value } => Ok(Instruction::new(
-                InstructionType::BooleanLiteral(value),
-                token,
-            )),
+            TokenType::BooleanLiteral { value } => {
+                if !self.args.disable_magic_warnings
+                    && !self.in_constant_declaration
+                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                {
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                            .print(self.args.disable_warnings)
+                    }
+                }
+                Ok(Instruction::new(
+                    InstructionType::BooleanLiteral(value),
+                    token,
+                ))
+            }
             _ => unreachable!(),
         }
     }
@@ -359,6 +411,7 @@ impl Parser {
             TokenType::Identifier { value } => {
                 match r#const {
                     true => {
+                        self.in_constant_declaration = true;
                         if !self.args.disable_style_warnings && !value.is_case(Case::UpperSnake) {
                             ParseWarning::new(
                                 ParseWarningType::ConstantNotUpperCase(value.to_string()),
@@ -382,6 +435,7 @@ impl Parser {
             }
             _ => {
                 self.tokens.advance_to_next_instruction();
+                self.in_constant_declaration = false;
                 return Err(ParseError::new(
                     ParseErrorType::MismatchedTokenType {
                         expected: TokenType::Identifier {
@@ -409,6 +463,7 @@ impl Parser {
 
                 self.environment.insert(variable.clone());
 
+                self.in_constant_declaration = false;
                 return Err(ParseError::new(
                     ParseErrorType::VaribleTypeAnnotation,
                     identifier,
@@ -424,6 +479,7 @@ impl Parser {
 
             r#type => {
                 self.tokens.advance_to_next_instruction();
+                self.in_constant_declaration = false;
                 return Err(ParseError::new(
                     ParseErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
@@ -439,6 +495,7 @@ impl Parser {
             TokenType::AssignmentOperator | TokenType::IterableAssignmentOperator => (),
             _ => {
                 self.tokens.advance_to_next_instruction();
+                self.in_constant_declaration = false;
                 return Err(ParseError::new(
                     ParseErrorType::MismatchedTokenType {
                         expected: TokenType::AssignmentOperator,
@@ -463,9 +520,11 @@ impl Parser {
             Ok(instruction) => instruction,
             Err(e) => {
                 self.environment.insert(variable.clone());
+                self.in_constant_declaration = false;
                 return Err(e);
             }
         };
+        self.in_constant_declaration = false;
         match &assignment.r#type {
             TokenType::AssignmentOperator => {
                 self.environment.insert(variable.clone());
@@ -473,6 +532,7 @@ impl Parser {
                     InstructionType::Assignment {
                         variable,
                         instruction: Box::new(instruction),
+                        token: identifier,
                     },
                     token,
                 ))
@@ -543,6 +603,7 @@ impl Parser {
             InstructionType::Assignment {
                 variable: variable.clone(),
                 instruction: Box::new(instruction),
+                token: token.clone(),
             },
             token,
         ))
@@ -611,6 +672,7 @@ impl Parser {
         let token = self.get_next_token()?;
         let mut block = Vec::new();
         self.environment.add_scope();
+        self.in_constant_declaration = false;
 
         let mut next_token = self.peek_next_token()?;
         while next_token.r#type != TokenType::CloseBlock {

@@ -198,7 +198,6 @@ impl ParseError {
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n\
-                                   \n\
                  {}                \n",
                 "error: ".bright_red(),
                 self.r#type,
@@ -240,6 +239,8 @@ pub enum ParseWarningType<'a> {
     SelfAssignment,
 
     NoBlock(&'a Token),
+
+    MagicLiteral,
 }
 
 pub struct ParseWarning<'a> {
@@ -263,8 +264,9 @@ impl<'a> std::fmt::Display for ParseWarningType<'a> {
             ParseWarningType::VariableNotSnakeCase(_identifier) => {
                 write!(f, "Variables should be in snake_case")
             }
-            ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
             ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
+            ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
+            ParseWarningType::MagicLiteral => write!(f, "Magic number detected"),
         }
     }
 }
@@ -282,64 +284,59 @@ impl<'a> ParseWarning<'a> {
             ParseWarningType::TrailingSemicolon => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {} {}             \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
                 "remove this semicolon".bright_yellow(),
             ),
             ParseWarningType::EmptyBlock => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {} {}             \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
                 "remove this block".bright_yellow(),
             ),
             ParseWarningType::UnusedValue => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {}                \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::UnusedVariable => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {} {}             \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
                 "prefix with `_` to suppress this warning".bright_yellow(),
             ),
             ParseWarningType::VariableNotRead => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {}                \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::ConstantNotUpperCase(identifier) => {
@@ -347,13 +344,12 @@ impl<'a> ParseWarning<'a> {
                 eprintln!(
                     "{}{}              \n\
                      In: {}:{}:{}      \n\
-                                       \n\
                      {} {}             \n",
                     "warning: ".bright_yellow(),
+                    self.r#type,
                     self.token.file,
                     self.token.row,
                     self.token.column,
-                    self.r#type,
                     self.token.as_string(PrintStyle::Warning),
                     format!("consider changing the name to {new_name}").bright_yellow(),
                 )
@@ -363,13 +359,12 @@ impl<'a> ParseWarning<'a> {
                 eprintln!(
                     "{}{}              \n\
                      In: {}:{}:{}      \n\
-                                       \n\
                      {} {}             \n",
                     "warning: ".bright_yellow(),
+                    self.r#type,
                     self.token.file,
                     self.token.row,
                     self.token.column,
-                    self.r#type,
                     self.token.as_string(PrintStyle::Warning),
                     format!("consider changing the name to {new_name}").bright_yellow(),
                 )
@@ -377,13 +372,12 @@ impl<'a> ParseWarning<'a> {
             ParseWarningType::SelfAssignment => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
-                                   \n\
                  {}                \n",
                 "warning: ".bright_yellow(),
+                self.r#type,
                 self.token.file,
                 self.token.row,
                 self.token.column,
-                self.r#type,
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::NoBlock(token) => match &self.token.last_token {
@@ -402,6 +396,18 @@ impl<'a> ParseWarning<'a> {
                 }
                 _ => unreachable!(),
             },
+            ParseWarningType::MagicLiteral => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "consider using a named constant".bright_yellow(),
+            ),
         }
     }
 }

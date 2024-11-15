@@ -3,6 +3,7 @@ use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
+use crate::token::Token;
 use crate::variable::Variable;
 
 pub struct TypeChecker {
@@ -83,7 +84,8 @@ impl TypeChecker {
             InstructionType::Assignment {
                 variable,
                 instruction,
-            } => self.check_assignment(&variable, &instruction),
+                token,
+            } => self.check_assignment(&variable, &instruction, token),
 
             InstructionType::IterableAssignment(variable, instruction) => {
                 self.check_iterable_assignment(&variable, &instruction)
@@ -211,6 +213,7 @@ impl TypeChecker {
         &mut self,
         variable: &Variable,
         instruction: &Instruction,
+        token: &Token,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
 
@@ -222,7 +225,7 @@ impl TypeChecker {
                     expected: vec![variable_type],
                     actual: instruction_type,
                 },
-                instruction.token.clone(),
+                token.clone(),
             ));
         }
 
@@ -231,7 +234,7 @@ impl TypeChecker {
             None => variable.clone(),
         };
         variable.read = false;
-        variable.last_assignment_token = instruction.token.clone();
+        variable.last_assignment_token = token.clone();
 
         self.environment.insert(variable);
         Ok(Type::None)
