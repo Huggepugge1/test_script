@@ -1,23 +1,25 @@
 use crate::interpreter::InstructionResult;
 use crate::r#type::Type;
-use crate::token::{Token, TokenType};
+use crate::token::{PrintStyle, Token, TokenType};
+use crate::variable::Variable;
+
+use colored::Colorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
-    UnexpectedToken,
+    UnexpectedToken(TokenType),
+
     UnexpectedEndOfFile,
+    UnclosedDelimiter(TokenType),
 
     MismatchedType {
-        expected: Type,
+        expected: Vec<Type>,
         actual: Type,
     },
-    MismatchedTypeBinary {
-        expected_left: Type,
-        actual_left: Type,
-        expected_right: Type,
-        actual_right: Type,
+    MismatchedTokenType {
+        expected: TokenType,
+        actual: TokenType,
     },
-    MismatchedTokenType(TokenType, TokenType),
 
     TypeCast {
         from: Type,
@@ -26,12 +28,10 @@ pub enum ParseErrorType {
 
     RegexError,
 
-    VariableNotDefined,
-    VariableIsConstant,
+    IdentifierNotDefined(String),
+    ConstantReassignment(Variable),
 
-    TestError,
-
-    NotImplemented,
+    VaribleTypeAnnotation,
 
     None,
 }
@@ -39,44 +39,62 @@ pub enum ParseErrorType {
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::UnexpectedToken => write!(f, "Unexpected token"),
-            ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
+            ParseErrorType::UnexpectedToken(token) => {
+                write!(f, "Unexpected token: {}", token)
+            }
 
-            ParseErrorType::MismatchedType { expected, actual } => {
-                write!(f, "Mismatched type: Expected {}, got {}", expected, actual)
+            ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
+            ParseErrorType::UnclosedDelimiter(token) => {
+                write!(f, "Unclosed delimiter: {}", token)
             }
-            ParseErrorType::MismatchedTypeBinary {
-                expected_left,
-                actual_left,
-                expected_right,
-                actual_right,
-            } => {
-                write!(
+
+            ParseErrorType::MismatchedType { expected, actual } => match expected.len() {
+                1 => write!(
                     f,
-                    "Mismatched types: Expected `{}` and `{}`, got `{}` and `{}`",
-                    expected_left, expected_right, actual_left, actual_right
-                )
-            }
-            ParseErrorType::MismatchedTokenType(type1, type2) => {
-                write!(
+                    "Type error: Expected `{}`, found `{}`",
+                    expected[0], actual
+                ),
+                _ => write!(
                     f,
-                    "Mismatched token type: Expected {}, got {}",
-                    type1, type2
-                )
+                    "Type error: Expected one of {}, found `{}`",
+                    expected
+                        .into_iter()
+                        .map(|r#type| format!("`{type}`"))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    actual
+                ),
+            },
+
+            ParseErrorType::MismatchedTokenType { expected, actual } => {
+                let expected = match expected {
+                    TokenType::Semicolon
+                    | TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock
+                    | TokenType::Colon
+                    | TokenType::Type { .. } => format!("`{expected}`"),
+                    _ => format!("{expected}"),
+                };
+                write!(f, "Expected {expected}, found {actual}")
             }
 
             ParseErrorType::TypeCast { from, to } => {
-                write!(f, "Type cast error: Cannot cast {} to {}", from, to)
+                write!(f, "Cannot cast `{from}` to `{to}`")
             }
 
-            ParseErrorType::RegexError => write!(f, "Regex error"),
+            ParseErrorType::RegexError => write!(f, "Regex syntax not supported"),
 
-            ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
-            ParseErrorType::VariableIsConstant => write!(f, "Variable is constant"),
-
-            ParseErrorType::TestError => write!(f, "Test error"),
-
-            ParseErrorType::NotImplemented => write!(f, "Not implemented"),
+            ParseErrorType::IdentifierNotDefined(identifier) => {
+                write!(f, "Identifier `{identifier}` not defined")
+            }
+            ParseErrorType::ConstantReassignment(constant) => {
+                write!(f, "Cannot reassign constant `{}`", constant.name)
+            }
+            ParseErrorType::VaribleTypeAnnotation => {
+                write!(f, "Type annotations are required")
+            }
 
             ParseErrorType::None => write!(f, ""),
         }
@@ -87,23 +105,17 @@ impl std::fmt::Display for ParseErrorType {
 pub struct ParseError {
     pub r#type: ParseErrorType,
     token: Token,
-    hint: String,
 }
 
 impl ParseError {
-    pub fn new(r#type: ParseErrorType, token: Token, hint: impl Into<String>) -> ParseError {
-        ParseError {
-            r#type,
-            token,
-            hint: hint.into(),
-        }
+    pub fn new(r#type: ParseErrorType, token: Token) -> ParseError {
+        ParseError { r#type, token }
     }
 
     pub fn none() -> ParseError {
         ParseError {
             r#type: ParseErrorType::None,
             token: Token::none(),
-            hint: String::new(),
         }
     }
 
@@ -111,11 +123,88 @@ impl ParseError {
         if self.r#type == ParseErrorType::None {
             return;
         }
-        eprintln!(
-            "Error: {} {:?}, {}:{}\n\
-             Hint: {}\n",
-            self.r#type, self.token.value, self.token.line, self.token.column, self.hint
-        );
+
+        match &self.r#type {
+            ParseErrorType::MismatchedTokenType {
+                expected: TokenType::Semicolon,
+                actual: _actual,
+            } => match &self.token.last_token {
+                Some(last_token) => {
+                    eprintln!(
+                        "{}{}              \n\
+                         In: {}:{}:{}      \n\
+                         {}                \n\
+                                           \n\
+                         {}                \n",
+                        "error: ".bright_red(),
+                        self.r#type,
+                        self.token.file,
+                        self.token.row,
+                        self.token.column,
+                        last_token
+                            .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
+                        self.token.as_string(PrintStyle::Error),
+                    )
+                }
+                None => {
+                    eprintln!(
+                        "{}{}              \n\
+                         In: {}:{}:{}      \n\
+                         {}                \n",
+                        "error: ".bright_red(),
+                        self.r#type,
+                        self.token.file,
+                        self.token.row,
+                        self.token.column,
+                        self.token.as_string(PrintStyle::Error),
+                    )
+                }
+            },
+            ParseErrorType::ConstantReassignment(var) => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n\
+                                   \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                var.token
+                    .as_string(PrintStyle::Help("consider changing to `let`")),
+                self.token.as_string(PrintStyle::Error),
+            ),
+
+            ParseErrorType::VaribleTypeAnnotation => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n\
+                                   \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.insert_tokens(
+                    vec![TokenType::Colon, TokenType::Type { value: Type::Any }],
+                    "add a type annotation here"
+                ),
+                self.token.as_string(PrintStyle::Error),
+            ),
+            _ => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Error),
+            ),
+        }
     }
 }
 
@@ -151,9 +240,13 @@ impl ParseWarning {
             return;
         }
         eprintln!(
-            "Warning: {}, {}:{}\n\
-             Hint: {}\n",
-            self.r#type, self.token.line, self.token.column, self.hint
+            "{}{}              \n\
+                               \n\
+             {} {}              \n",
+            "warning: ".bright_yellow(),
+            self.r#type,
+            self.token.as_string(PrintStyle::Warning),
+            "remove this semicolon".bright_yellow(),
         );
     }
 }
