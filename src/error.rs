@@ -69,6 +69,15 @@ impl std::fmt::Display for ParseErrorType {
             },
 
             ParseErrorType::MismatchedTokenType { expected, actual } => {
+                let expected = match expected {
+                    TokenType::Semicolon
+                    | TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock
+                    | TokenType::Colon => format!("`{expected}`"),
+                    _ => format!("{expected}"),
+                };
                 write!(f, "Expected {expected}, found {actual}")
             }
 

@@ -68,7 +68,7 @@ impl std::fmt::Display for TokenType {
             TokenType::UnaryOperator { value } => write!(f, "unary operator `{value}`"),
             TokenType::BinaryOperator { value } => write!(f, "binary operator `{value}`"),
 
-            TokenType::Semicolon => write!(f, "`;`"),
+            TokenType::Semicolon => write!(f, ";"),
 
             TokenType::None => write!(f, ""),
         }

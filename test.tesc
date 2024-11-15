@@ -1,5 +1,5 @@
 test1("./input_test") {
-    let quit = "q";
+    const quit = "q";
     
     quit = "send";
 
