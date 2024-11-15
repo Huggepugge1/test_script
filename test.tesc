@@ -1,7 +1,15 @@
 test1("./input_test") {
-    let quit: int = "q";
-    quit = "send";
+    if true {
+        println("Hello, World");
+    }
 
+    let _str: string = if 1 != 1 {
+        "string";
+    } else {
+        1;
+    }
+
+    const quit: string = "q";
     input(quit);
     output(quit);
 }

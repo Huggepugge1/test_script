@@ -79,8 +79,8 @@ impl std::fmt::Display for TokenType {
 pub struct Token {
     pub r#type: TokenType,
     pub file: String,
-    pub row: u32,
-    pub column: u32,
+    pub row: usize,
+    pub column: usize,
 
     pub line: String,
     pub last_token: Option<Box<Token>>,

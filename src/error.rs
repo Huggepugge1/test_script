@@ -40,11 +40,28 @@ impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseErrorType::UnexpectedToken(token) => {
+                let token = match token {
+                    TokenType::Semicolon
+                    | TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock
+                    | TokenType::Colon
+                    | TokenType::Type { .. } => format!("`{token}`"),
+                    _ => format!("{token}"),
+                };
                 write!(f, "Unexpected token: {}", token)
             }
 
             ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
             ParseErrorType::UnclosedDelimiter(token) => {
+                let token = match token {
+                    TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock => format!("`{token}`"),
+                    _ => unreachable!(),
+                };
                 write!(f, "Unclosed delimiter: {}", token)
             }
 
@@ -139,8 +156,8 @@ impl ParseError {
                         "error: ".bright_red(),
                         self.r#type,
                         self.token.file,
-                        self.token.row,
-                        self.token.column,
+                        last_token.row,
+                        last_token.column + last_token.len(),
                         last_token
                             .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
                         self.token.as_string(PrintStyle::Error),
@@ -160,21 +177,23 @@ impl ParseError {
                     )
                 }
             },
-            ParseErrorType::ConstantReassignment(var) => eprintln!(
-                "{}{}              \n\
+            ParseErrorType::ConstantReassignment(var) => {
+                eprintln!(
+                    "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n\
                                    \n\
                  {}                \n",
-                "error: ".bright_red(),
-                self.r#type,
-                self.token.file,
-                self.token.row,
-                self.token.column,
-                var.token
-                    .as_string(PrintStyle::Help("consider changing to `let`")),
-                self.token.as_string(PrintStyle::Error),
-            ),
+                    "error: ".bright_red(),
+                    self.r#type,
+                    self.token.file,
+                    var.token.row,
+                    var.token.column,
+                    var.token
+                        .as_string(PrintStyle::Help("consider changing to `let`")),
+                    self.token.as_string(PrintStyle::Error),
+                )
+            }
 
             ParseErrorType::VaribleTypeAnnotation => eprintln!(
                 "{}{}              \n\
@@ -210,44 +229,73 @@ impl ParseError {
 
 pub enum ParseWarningType {
     TrailingSemicolon,
+    EmptyBlock,
+
+    UnusedValue,
+    UnusedVariable,
 }
 
 pub struct ParseWarning {
     pub r#type: ParseWarningType,
     pub token: Token,
-    pub hint: String,
 }
 
 impl std::fmt::Display for ParseWarningType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
+            ParseWarningType::EmptyBlock => write!(f, "Empty block"),
+            ParseWarningType::UnusedValue => write!(f, "Unused value"),
+            ParseWarningType::UnusedVariable => write!(f, "Unused variable"),
         }
     }
 }
 
 impl ParseWarning {
-    pub fn new(r#type: ParseWarningType, token: Token, hint: impl Into<String>) -> ParseWarning {
-        ParseWarning {
-            r#type,
-            token,
-            hint: hint.into(),
-        }
+    pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
+        ParseWarning { r#type, token }
     }
 
     pub fn print(&self, disable_warnings: bool) {
         if disable_warnings {
             return;
         }
-        eprintln!(
-            "{}{}              \n\
-                               \n\
-             {} {}              \n",
-            "warning: ".bright_yellow(),
-            self.r#type,
-            self.token.as_string(PrintStyle::Warning),
-            "remove this semicolon".bright_yellow(),
-        );
+        match self.r#type {
+            ParseWarningType::TrailingSemicolon => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+                "remove this semicolon".bright_yellow(),
+            ),
+            ParseWarningType::EmptyBlock => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+                "remove this block".bright_yellow(),
+            ),
+            ParseWarningType::UnusedValue => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+            ParseWarningType::UnusedVariable => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+        }
     }
 }
 

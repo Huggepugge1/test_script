@@ -7,6 +7,7 @@ pub struct Variable {
     pub r#const: bool,
     pub r#type: Type,
     pub token: Token,
+    pub used: bool,
 }
 
 impl std::fmt::Display for Variable {
@@ -28,6 +29,7 @@ impl Variable {
             r#const,
             r#type,
             token,
+            used: false,
         }
     }
 }

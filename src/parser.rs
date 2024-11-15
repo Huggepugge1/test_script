@@ -1,6 +1,6 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
-use crate::error::{ParseError, ParseErrorType};
+use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
 use crate::regex;
@@ -15,10 +15,11 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: TokenCollection, args: Args) -> Self {
+    pub fn new(tokens: TokenCollection, mut args: Args) -> Self {
+        args.disable_warnings = true;
         return Self {
             tokens,
-            environment: ParseEnvironment::new(),
+            environment: ParseEnvironment::new(args.clone()),
             args,
             success: true,
         };
@@ -95,7 +96,13 @@ impl Parser {
             },
 
             TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
-            _ => unreachable!(),
+            token_type => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken(token_type.clone()),
+                    token.clone(),
+                ));
+            }
         };
 
         token = self.peek_next_token()?;
@@ -568,7 +575,7 @@ impl Parser {
                 Err(_) => {
                     self.tokens.advance_to_next_instruction();
                     return Err(ParseError::new(
-                        ParseErrorType::UnclosedDelimiter(TokenType::CloseBlock),
+                        ParseErrorType::UnclosedDelimiter(TokenType::OpenBlock),
                         token,
                     ));
                 }
@@ -576,6 +583,10 @@ impl Parser {
         }
 
         self.environment.remove_scope();
+        if block.is_empty() {
+            ParseWarning::new(ParseWarningType::EmptyBlock, token.clone())
+                .print(self.args.disable_warnings)
+        }
         Ok(Instruction::new(InstructionType::Block(block), token))
     }
 

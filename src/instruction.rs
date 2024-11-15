@@ -193,6 +193,20 @@ impl Instruction {
     pub fn new(r#type: InstructionType, token: Token) -> Self {
         Self { r#type, token }
     }
+
+    pub fn inner_most(&self) -> &Self {
+        match &self.r#type {
+            InstructionType::Block(ref instructions) => {
+                if instructions.is_empty() {
+                    self
+                } else {
+                    instructions.last().unwrap().inner_most()
+                }
+            }
+            InstructionType::Paren(ref instruction) => instruction.inner_most(),
+            _ => self,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

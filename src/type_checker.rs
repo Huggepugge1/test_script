@@ -16,7 +16,7 @@ impl TypeChecker {
     pub fn new(program: Vec<Instruction>, args: Args) -> Self {
         Self {
             program,
-            environment: ParseEnvironment::new(),
+            environment: ParseEnvironment::new(args.clone()),
             success: true,
             args,
         }
@@ -52,22 +52,7 @@ impl TypeChecker {
 
             InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
 
-            InstructionType::Block(instructions) => {
-                let mut result = Type::None;
-                self.environment.add_scope();
-                for instruction in instructions {
-                    result = match self.check_instruction(&instruction) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            e.print();
-                            self.success = false;
-                            Type::None
-                        }
-                    }
-                }
-                self.environment.remove_scope();
-                Ok(result)
-            }
+            InstructionType::Block(instructions) => self.check_block(instructions),
 
             InstructionType::Paren(instruction) => self.check_instruction(instruction),
 
@@ -86,6 +71,8 @@ impl TypeChecker {
             }
 
             InstructionType::Variable(variable) => {
+                let mut variable = self.environment.get(&variable.name).unwrap().clone();
+                variable.used = true;
                 self.environment.insert(variable.clone());
                 Ok(variable.r#type)
             }
@@ -118,7 +105,6 @@ impl TypeChecker {
                 ParseWarning::new(
                     ParseWarningType::TrailingSemicolon,
                     instruction.token.clone(),
-                    "Remove the trailing semicolon",
                 )
                 .print(self.args.disable_warnings);
                 Ok(Type::None)
@@ -190,6 +176,34 @@ impl TypeChecker {
         }
     }
 
+    fn check_block(&mut self, instructions: &Vec<Instruction>) -> Result<Type, ParseError> {
+        self.environment.add_scope();
+        if (instructions.len()) == 0 {
+            return Ok(Type::None);
+        }
+        for instruction in &instructions[..instructions.len() - 1] {
+            match self.check_instruction(&instruction) {
+                Ok(t) => match t {
+                    Type::None => (),
+                    _ => {
+                        ParseWarning::new(
+                            ParseWarningType::UnusedValue,
+                            instruction.inner_most().token.clone(),
+                        )
+                        .print(self.args.disable_warnings);
+                    }
+                },
+                Err(e) => {
+                    e.print();
+                    self.success = false;
+                }
+            }
+        }
+        let result = self.check_instruction(&instructions[instructions.len() - 1])?;
+        self.environment.remove_scope();
+        Ok(result)
+    }
+
     fn check_assignment(
         &mut self,
         variable: &Variable,
@@ -210,7 +224,7 @@ impl TypeChecker {
         }
 
         self.environment.insert(variable.clone());
-        Ok(variable_type)
+        Ok(Type::None)
     }
 
     fn check_iterable_assignment(
@@ -524,8 +538,13 @@ impl TypeChecker {
             ));
         }
         let result = self.check_instruction(&instruction)?;
-        let result_else = self.check_instruction(&r#else)?;
-        if result == result_else {
+        let result_else = if *r#else != Instruction::NONE {
+            self.check_instruction(&r#else)?
+        } else {
+            Type::None
+        };
+
+        if result == Type::None || result == result_else {
             Ok(result)
         } else {
             Err(ParseError::new(
@@ -533,7 +552,7 @@ impl TypeChecker {
                     expected: vec![result],
                     actual: result_else,
                 },
-                instruction.token.clone(),
+                r#else.inner_most().token.clone(),
             ))
         }
     }
