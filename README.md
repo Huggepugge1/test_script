@@ -22,5 +22,12 @@ After installing the package, you can run the program by using `test-script [fil
 ### Using cargo
 Run the program by either doing `cargo run -- [file name]` if you are in this repo or running the binary directly using `path/to/test-script [file name]`.
 
+## Syntax highlighting
+### VSCode 
+Install the extension test-script.
+
+### Neovim
+There is a Neovim plugin at https://github.com/Huggepugge1/test-script.nvim
+
 ## Help
 Read documentation.md and look at the examples. If you need help with using the interpreter, use `./test_script --help`.
