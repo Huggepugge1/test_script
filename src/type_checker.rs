@@ -199,7 +199,7 @@ impl TypeChecker {
 
         let instruction_type = self.check_instruction(&instruction.clone())?;
 
-        if variable_type != instruction_type {
+        if variable_type != Type::Any && variable_type != instruction_type {
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![variable_type],

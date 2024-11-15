@@ -33,8 +33,6 @@ pub enum ParseErrorType {
 
     VaribleTypeAnnotation,
 
-    TestError,
-
     NotImplemented,
 
     None,
@@ -89,8 +87,6 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::VaribleTypeAnnotation => {
                 write!(f, "Type annotations are required")
             }
-
-            ParseErrorType::TestError => write!(f, "Test error"),
 
             ParseErrorType::NotImplemented => write!(f, "Not implemented"),
 

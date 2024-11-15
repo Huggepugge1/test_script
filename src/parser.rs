@@ -24,7 +24,7 @@ impl Parser {
         };
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Instruction>, ParseError> {
+    pub fn parse(&mut self) -> Result<Vec<Instruction>, Vec<Instruction>> {
         let mut program = Vec::new();
 
         while let Some(token) = self.tokens.peek() {
@@ -46,20 +46,13 @@ impl Parser {
 
             match instruction {
                 Ok(instruction) => program.push(instruction),
-                Err(e) => match e.r#type {
-                    ParseErrorType::TestError => (),
-                    _ => e.print(),
-                },
+                Err(e) => e.print(),
             }
         }
 
         match self.success {
             true => Ok(program),
-
-            false => Err(ParseError::new(
-                ParseErrorType::TestError,
-                self.tokens.current().unwrap(),
-            )),
+            false => Err(program),
         }
     }
 
@@ -366,10 +359,15 @@ impl Parser {
         match self.expect_token(TokenType::Colon) {
             Ok(_) => (),
             Err(_) => {
+                let variable =
+                    Variable::new(identifier_name.clone(), r#const, Type::Any, token.clone());
+
+                self.environment.insert(variable.clone());
+
                 return Err(ParseError::new(
                     ParseErrorType::VaribleTypeAnnotation,
                     identifier,
-                ))
+                ));
             }
         }
 
