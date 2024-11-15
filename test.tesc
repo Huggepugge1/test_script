@@ -1,6 +1,5 @@
 test1("./input_test") {
-    const quit = "q";
-    
+    let quit: int = "q";
     quit = "send";
 
     input(quit);

@@ -110,10 +110,7 @@ impl Token {
 
     pub fn len(&self) -> usize {
         match &self.r#type {
-            TokenType::StringLiteral { value } => {
-                println!("value: {}", value);
-                value.len()
-            }
+            TokenType::StringLiteral { value } => value.len(),
             TokenType::RegexLiteral { value } => value.len(),
             TokenType::IntegerLiteral { value } => value.to_string().len(),
             TokenType::BooleanLiteral { value } => value.to_string().len(),

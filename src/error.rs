@@ -33,8 +33,6 @@ pub enum ParseErrorType {
 
     VaribleTypeAnnotation,
 
-    NotImplemented,
-
     None,
 }
 
@@ -75,7 +73,8 @@ impl std::fmt::Display for ParseErrorType {
                     | TokenType::CloseParen
                     | TokenType::OpenBlock
                     | TokenType::CloseBlock
-                    | TokenType::Colon => format!("`{expected}`"),
+                    | TokenType::Colon
+                    | TokenType::Type { .. } => format!("`{expected}`"),
                     _ => format!("{expected}"),
                 };
                 write!(f, "Expected {expected}, found {actual}")
@@ -96,8 +95,6 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::VaribleTypeAnnotation => {
                 write!(f, "Type annotations are required")
             }
-
-            ParseErrorType::NotImplemented => write!(f, "Not implemented"),
 
             ParseErrorType::None => write!(f, ""),
         }

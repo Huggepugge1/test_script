@@ -87,15 +87,15 @@ impl Parser {
                 "-" => self.parse_unary_operator()?,
                 _ => {
                     self.tokens.advance_to_next_instruction();
-                    return Err(ParseError::new(ParseErrorType::NotImplemented, token));
+                    Err(ParseError::new(
+                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                        token.clone(),
+                    ))?
                 }
             },
 
             TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
-            _ => {
-                self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(ParseErrorType::NotImplemented, token));
-            }
+            _ => unreachable!(),
         };
 
         token = self.peek_next_token()?;
@@ -371,16 +371,20 @@ impl Parser {
             }
         }
 
-        let r#type = match &self.get_next_token()?.r#type {
-            TokenType::Type { value } => value.clone(),
-            _ => {
+        let r#type = match &self.get_next_token()? {
+            Token {
+                r#type: TokenType::Type { value },
+                ..
+            } => value.clone(),
+
+            r#type => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
                     ParseErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
-                        actual: identifier.r#type.clone(),
+                        actual: r#type.r#type.clone(),
                     },
-                    identifier,
+                    r#type.clone(),
                 ));
             }
         };
