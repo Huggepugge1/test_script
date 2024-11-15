@@ -1,10 +1,12 @@
 use crate::r#type::Type;
+use crate::token::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     pub name: String,
     pub r#const: bool,
     pub r#type: Type,
+    pub token: Token,
 }
 
 impl std::fmt::Display for Variable {
@@ -20,11 +22,12 @@ impl std::fmt::Display for Variable {
 }
 
 impl Variable {
-    pub fn new(name: String, r#const: bool, r#type: Type) -> Self {
+    pub fn new(name: String, r#const: bool, r#type: Type, token: Token) -> Self {
         Self {
             name,
             r#const,
             r#type,
+            token,
         }
     }
 }

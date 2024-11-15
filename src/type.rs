@@ -34,7 +34,7 @@ impl std::fmt::Display for Type {
 
             Type::Iterable => write!(f, "Iterable"),
 
-            Type::Any => write!(f, "Any"),
+            Type::Any => write!(f, "T"),
         }
     }
 }

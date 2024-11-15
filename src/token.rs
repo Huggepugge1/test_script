@@ -1,9 +1,10 @@
 use crate::r#type::Type;
 use colored::Colorize;
 
-pub enum PrintStyle {
+pub enum PrintStyle<'a> {
     Warning,
     Error,
+    Help(&'a str),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -50,7 +51,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Keyword { value } => write!(f, "keyword `{value}`"),
             TokenType::BuiltIn { value } => write!(f, "built-in `{value}`"),
 
-            TokenType::Type { value } => write!(f, "type `{value}`"),
+            TokenType::Type { value } => write!(f, "{value}"),
             TokenType::Colon => write!(f, ":"),
 
             TokenType::Identifier { value } => write!(f, "identifier `{value}`"),
@@ -165,16 +166,28 @@ impl Token {
             match style {
                 PrintStyle::Warning => "^".repeat(self.len()).bright_yellow().to_string(),
                 PrintStyle::Error => "^".repeat(self.len()).bright_red().to_string(),
+                PrintStyle::Help(message) =>
+                    "^".repeat(self.len()).bright_blue().to_string() + " " + message,
             }
         )
     }
 
-    pub fn expected_semicolon(&self) -> String {
+    pub fn insert_tokens(&self, tokens: Vec<TokenType>, message: &str) -> String {
+        let token_len = self.column as usize + self.len() - 1;
         let padding_length = usize::max(
             Self::LINE_NUMBER_PADDING,
             self.row.to_string().len() as usize,
         );
-        let padding = &" ".repeat(padding_length + self.column as usize + self.len() - 1);
+        let padding = &" ".repeat(padding_length + token_len);
+
+        let token_string = tokens
+            .iter()
+            .fold(String::new(), |acc, token| acc + &format!("{} ", token));
+
+        let new_line = self.line[0..token_len].to_string()
+            + &token_string[..token_string.len() - 1]
+            + &self.line[token_len..];
+
         format!(
             "{:<4}{}      \n\
              {}{} {}",
@@ -183,10 +196,10 @@ impl Token {
                 g: 0xFE,
                 b: 0xBF,
             }),
-            self.line,
+            new_line,
             padding,
-            "^".bright_blue(),
-            "add a semicolon here".bright_blue()
+            "+".repeat(token_string.len() - 1).bright_green(),
+            message.bright_green()
         )
     }
 }

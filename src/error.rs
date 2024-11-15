@@ -1,6 +1,7 @@
 use crate::interpreter::InstructionResult;
 use crate::r#type::Type;
 use crate::token::{PrintStyle, Token, TokenType};
+use crate::variable::Variable;
 
 use colored::Colorize;
 
@@ -27,8 +28,10 @@ pub enum ParseErrorType {
 
     RegexError,
 
-    VariableNotDefined,
-    ConstantReassignment(String),
+    IdentifierNotDefined(String),
+    ConstantReassignment(Variable),
+
+    VaribleTypeAnnotation,
 
     TestError,
 
@@ -77,9 +80,14 @@ impl std::fmt::Display for ParseErrorType {
 
             ParseErrorType::RegexError => write!(f, "Regex syntax not supported"),
 
-            ParseErrorType::VariableNotDefined => write!(f, "Variable not defined"),
+            ParseErrorType::IdentifierNotDefined(identifier) => {
+                write!(f, "Identifier `{identifier}` not defined")
+            }
             ParseErrorType::ConstantReassignment(constant) => {
-                write!(f, "Cannot reassign constant `{constant}`")
+                write!(f, "Cannot reassign constant `{}`", constant.name)
+            }
+            ParseErrorType::VaribleTypeAnnotation => {
+                write!(f, "Type annotations are required")
             }
 
             ParseErrorType::TestError => write!(f, "Test error"),
@@ -131,7 +139,8 @@ impl ParseError {
                         self.token.file,
                         self.token.row,
                         self.token.column,
-                        last_token.expected_semicolon(),
+                        last_token
+                            .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
                         self.token.as_string(PrintStyle::Error),
                     )
                 }
@@ -149,6 +158,39 @@ impl ParseError {
                     )
                 }
             },
+            ParseErrorType::ConstantReassignment(var) => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n\
+                                   \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                var.token
+                    .as_string(PrintStyle::Help("consider changing to `let`")),
+                self.token.as_string(PrintStyle::Error),
+            ),
+
+            ParseErrorType::VaribleTypeAnnotation => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n\
+                                   \n\
+                 {}                \n",
+                "error: ".bright_red(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.insert_tokens(
+                    vec![TokenType::Colon, TokenType::Type { value: Type::Any }],
+                    "add a type annotation here"
+                ),
+                self.token.as_string(PrintStyle::Error),
+            ),
             _ => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\

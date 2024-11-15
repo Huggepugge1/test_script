@@ -363,7 +363,15 @@ impl Parser {
             }
         };
 
-        self.expect_token(TokenType::Colon)?;
+        match self.expect_token(TokenType::Colon) {
+            Ok(_) => (),
+            Err(_) => {
+                return Err(ParseError::new(
+                    ParseErrorType::VaribleTypeAnnotation,
+                    identifier,
+                ))
+            }
+        }
 
         let r#type = match &self.get_next_token()?.r#type {
             TokenType::Type { value } => value.clone(),
@@ -394,7 +402,12 @@ impl Parser {
             }
         }
 
-        let variable = Variable::new(identifier_name.clone(), r#const, r#type.clone());
+        let variable = Variable::new(
+            identifier_name.clone(),
+            r#const,
+            r#type.clone(),
+            token.clone(),
+        );
 
         let instruction = match self.parse_expression(true, true) {
             Ok(instruction) => instruction,
@@ -441,7 +454,7 @@ impl Parser {
         if variable.r#const {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::ConstantReassignment(variable.name.clone()),
+                ParseErrorType::ConstantReassignment(variable.clone()),
                 instruction.token.clone(),
             ));
         }
@@ -461,7 +474,7 @@ impl Parser {
         if self.environment.get(&variable.name).is_none() {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
-                ParseErrorType::VariableNotDefined,
+                ParseErrorType::IdentifierNotDefined(variable.name.clone()),
                 token.clone(),
             ));
         }
@@ -482,7 +495,7 @@ impl Parser {
                 if self.environment.get(&value).is_none() {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
-                        ParseErrorType::VariableNotDefined,
+                        ParseErrorType::IdentifierNotDefined(value.clone()),
                         token.clone(),
                     ))
                 } else {
