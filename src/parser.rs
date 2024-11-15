@@ -60,7 +60,14 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Result<Instruction, ParseError> {
         let instruction = self.parse_expression(true, true)?;
-        self.end_statement()?;
+        match self.end_statement() {
+            Ok(_) => (),
+            Err(e) => {
+                e.print();
+                self.success = false;
+            }
+        }
+
         Ok(instruction)
     }
 
@@ -638,7 +645,6 @@ impl Parser {
         let token = self.get_next_token()?;
         let condition = self.parse_expression(true, true)?;
         let statement = self.parse_statement()?;
-        println!("{:?}", self.tokens.last());
         match statement.r#type {
             InstructionType::Block(_) => (),
             InstructionType::None => {
@@ -652,7 +658,7 @@ impl Parser {
                 ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
                 statement.token.clone(),
             )
-            .print(self.args.disable_warnings),
+            .print(self.args.disable_warnings || self.args.disable_style_warnings),
         }
         let r#else = match &self.peek_next_token()?.r#type {
             TokenType::Keyword { value } => match value.as_str() {
@@ -676,13 +682,11 @@ impl Parser {
         match r#else.r#type {
             InstructionType::Block(_) => (),
             InstructionType::None => (),
-            _ => {
-                ParseWarning::new(
-                    ParseWarningType::NoBlock(&self.tokens.peek().unwrap()),
-                    r#else.token.clone(),
-                )
-                .print(self.args.disable_warnings);
-            }
+            _ => ParseWarning::new(
+                ParseWarningType::NoBlock(&self.tokens.peek().unwrap()),
+                r#else.token.clone(),
+            )
+            .print(self.args.disable_warnings || self.args.disable_style_warnings),
         }
 
         Ok(Instruction::new(
@@ -716,7 +720,7 @@ impl Parser {
         let statement = statement?;
 
         match statement.r#type {
-            InstructionType::Block(_) => self.tokens.back(),
+            InstructionType::Block(_) => (),
             InstructionType::None => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -728,8 +732,10 @@ impl Parser {
                 ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
                 statement.token.clone(),
             )
-            .print(self.args.disable_warnings),
+            .print(self.args.disable_warnings || self.args.disable_style_warnings),
         }
+
+        self.tokens.back();
         Ok(Instruction::new(
             InstructionType::For(Box::new(assignment), Box::new(statement)),
             token,

@@ -212,15 +212,21 @@ impl Token {
         );
         let line_padding = " ".repeat(self.line.chars().take_while(|c| c.is_whitespace()).count());
 
-        let start_line = self.line[..token_len].to_string() + "{";
+        let start_line = if token_len > self.line.len() {
+            self.line[..self.line.len()].to_string() + " {"
+        } else {
+            self.line[..token_len].to_string() + "{"
+        };
         let start_line_padding = &" ".repeat(padding_length + token_len);
 
         let content_line = line_padding.clone()
             + "    "
             + &(if self.row == close_token.row {
-                self.line[token_len..close_token.column as usize].to_string()
+                self.line[token_len..close_token.column as usize]
+                    .trim()
+                    .to_string()
             } else {
-                self.line[token_len..].to_string()
+                close_token.line.to_string()
             });
 
         let end_block_line = line_padding.clone() + "}";
@@ -234,8 +240,7 @@ impl Token {
         };
 
         let start_line = format!(
-            "{:<4}{} \n\
-             {}{}    \n",
+            "{:<4}{}\n{}{}",
             self.row.to_string().color(colored::Color::TrueColor {
                 r: 0x9F,
                 g: 0xFE,
@@ -246,7 +251,7 @@ impl Token {
             "+ open the block here".bright_green()
         );
         let content_line = format!(
-            "{:<4}{} \n",
+            "{:<4}{}",
             (self.row + 1).to_string().color(colored::Color::TrueColor {
                 r: 0x9F,
                 g: 0xFE,
@@ -255,8 +260,7 @@ impl Token {
             &content_line,
         );
         let end_block_line = format!(
-            "{:<4}{} \n\
-             {}{}    \n",
+            "{:<4}{}\n{}{}",
             (usize::max(self.row + 2, close_token.row + 1))
                 .to_string()
                 .color(colored::Color::TrueColor {
@@ -271,7 +275,7 @@ impl Token {
         match after_line {
             Some(after_line) => {
                 let after_line = format!(
-                    "{:<4}{} \n",
+                    "{:<4}{}",
                     (usize::max(self.row + 3, close_token.row + 1))
                         .to_string()
                         .color(colored::Color::TrueColor {
@@ -283,11 +287,11 @@ impl Token {
                 );
 
                 format!(
-                    "{}\n{}\n{}\n{}\n",
+                    "{}\n{}\n{}\n{}",
                     start_line, content_line, end_block_line, after_line
                 )
             }
-            None => format!("{}\n{}\n{}\n", start_line, content_line, end_block_line),
+            None => format!("{}\n{}\n{}", start_line, content_line, end_block_line),
         }
     }
 }
@@ -355,14 +359,6 @@ impl TokenCollection {
                 self.back();
                 break;
             }
-        }
-    }
-
-    pub fn last(&self) -> Option<Token> {
-        if self.index == 0 {
-            None
-        } else {
-            Some(self.tokens[self.index - 1].clone())
         }
     }
 }

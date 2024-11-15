@@ -151,6 +151,7 @@ impl ParseError {
                     eprintln!(
                         "{}{}              \n\
                          In: {}:{}:{}      \n\
+                         {}                \n\
                          {}                \n",
                         "error: ".bright_red(),
                         self.r#type,
@@ -159,6 +160,7 @@ impl ParseError {
                         last_token.column + last_token.len(),
                         last_token
                             .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
+                        self.token.as_string(PrintStyle::Help("unexpected token")),
                     )
                 }
                 None => {
@@ -180,7 +182,6 @@ impl ParseError {
                     "{}{}              \n\
                      In: {}:{}:{}      \n\
                      {}                \n\
-                                       \n\
                      {}                \n",
                     "error: ".bright_red(),
                     self.r#type,
