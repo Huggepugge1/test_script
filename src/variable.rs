@@ -6,8 +6,13 @@ pub struct Variable {
     pub name: String,
     pub r#const: bool,
     pub r#type: Type,
-    pub token: Token,
-    pub used: bool,
+
+    pub declaration_token: Token,
+    pub identifier_token: Token,
+
+    pub last_assignment_token: Token,
+
+    pub read: bool,
 }
 
 impl std::fmt::Display for Variable {
@@ -19,17 +24,5 @@ impl std::fmt::Display for Variable {
             self.name,
             self.r#type
         )
-    }
-}
-
-impl Variable {
-    pub fn new(name: String, r#const: bool, r#type: Type, token: Token) -> Self {
-        Self {
-            name,
-            r#const,
-            r#type,
-            token,
-            used: false,
-        }
     }
 }

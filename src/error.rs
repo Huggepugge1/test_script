@@ -4,6 +4,7 @@ use crate::token::{PrintStyle, Token, TokenType};
 use crate::variable::Variable;
 
 use colored::Colorize;
+use convert_case::{Case, Casing};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
@@ -187,9 +188,9 @@ impl ParseError {
                     "error: ".bright_red(),
                     self.r#type,
                     self.token.file,
-                    var.token.row,
-                    var.token.column,
-                    var.token
+                    var.declaration_token.row,
+                    var.declaration_token.column,
+                    var.declaration_token
                         .as_string(PrintStyle::Help("consider changing to `let`")),
                     self.token.as_string(PrintStyle::Error),
                 )
@@ -233,6 +234,12 @@ pub enum ParseWarningType {
 
     UnusedValue,
     UnusedVariable,
+    VariableNotRead,
+
+    ConstantNotUpperCase(String),
+    VariableNotSnakeCase(String),
+
+    SelfAssignment,
 }
 
 pub struct ParseWarning {
@@ -247,6 +254,16 @@ impl std::fmt::Display for ParseWarningType {
             ParseWarningType::EmptyBlock => write!(f, "Empty block"),
             ParseWarningType::UnusedValue => write!(f, "Unused value"),
             ParseWarningType::UnusedVariable => write!(f, "Unused variable"),
+            ParseWarningType::VariableNotRead => {
+                write!(f, "Variable is not read after assignment")
+            }
+            ParseWarningType::ConstantNotUpperCase(_identifier) => {
+                write!(f, "Constants should be in UPPER_SNAKE_CASE")
+            }
+            ParseWarningType::VariableNotSnakeCase(_identifier) => {
+                write!(f, "Variables should be in snake_case")
+            }
+            ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
         }
     }
 }
@@ -260,7 +277,7 @@ impl ParseWarning {
         if disable_warnings {
             return;
         }
-        match self.r#type {
+        match &self.r#type {
             ParseWarningType::TrailingSemicolon => eprintln!(
                 "{}{}              \n\
                                    \n\
@@ -288,6 +305,47 @@ impl ParseWarning {
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::UnusedVariable => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+                "prefix with `_` to suppress this warning".bright_yellow(),
+            ),
+            ParseWarningType::VariableNotRead => eprintln!(
+                "{}{}              \n\
+                                   \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+            ParseWarningType::ConstantNotUpperCase(identifier) => {
+                let new_name = identifier.to_case(Case::UpperSnake);
+                eprintln!(
+                    "{}{}              \n\
+                                       \n\
+                     {} {}             \n",
+                    "warning: ".bright_yellow(),
+                    self.r#type,
+                    self.token.as_string(PrintStyle::Warning),
+                    format!("consider changing the name to {new_name}").bright_yellow(),
+                )
+            }
+            ParseWarningType::VariableNotSnakeCase(identifier) => {
+                let new_name = identifier.to_case(Case::Snake);
+                eprintln!(
+                    "{}{}              \n\
+                                       \n\
+                     {} {}             \n",
+                    "warning: ".bright_yellow(),
+                    self.r#type,
+                    self.token.as_string(PrintStyle::Warning),
+                    format!("consider changing the name to {new_name}").bright_yellow(),
+                )
+            }
+            ParseWarningType::SelfAssignment => eprintln!(
                 "{}{}              \n\
                                    \n\
                  {}                \n",

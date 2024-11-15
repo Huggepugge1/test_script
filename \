@@ -7,8 +7,6 @@ use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
 use crate::variable::Variable;
 
-use convert_case::{Case, Casing};
-
 pub struct Parser {
     tokens: TokenCollection,
     environment: ParseEnvironment,
@@ -17,7 +15,8 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: TokenCollection, args: Args) -> Self {
+    pub fn new(tokens: TokenCollection, mut args: Args) -> Self {
+        args.disable_warnings = true;
         return Self {
             tokens,
             environment: ParseEnvironment::new(args.clone()),
@@ -349,30 +348,7 @@ impl Parser {
         let identifier = self.get_next_token()?;
 
         let identifier_name = match &identifier.r#type {
-            TokenType::Identifier { value } => {
-                match r#const {
-                    true => {
-                        if !self.args.disable_style_warnings && !value.is_case(Case::UpperSnake) {
-                            ParseWarning::new(
-                                ParseWarningType::ConstantNotUpperCase(value.to_string()),
-                                identifier.clone(),
-                            )
-                            .print(self.args.disable_warnings)
-                        }
-                    }
-                    false => {
-                        if !self.args.disable_style_warnings && !value.is_case(Case::Snake) {
-                            ParseWarning::new(
-                                ParseWarningType::VariableNotSnakeCase(value.to_string()),
-                                identifier.clone(),
-                            )
-                            .print(self.args.disable_warnings)
-                        }
-                    }
-                }
-                if r#const && !value.is_case(Case::UpperSnake) {}
-                value.clone()
-            }
+            TokenType::Identifier { value } => value.clone(),
             _ => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -396,8 +372,7 @@ impl Parser {
                     r#type: Type::Any,
                     declaration_token: token.clone(),
                     identifier_token: identifier.clone(),
-                    last_assignment_token: token.clone(),
-                    read: true,
+                    used: false,
                 };
 
                 self.environment.insert(variable.clone());
@@ -448,8 +423,7 @@ impl Parser {
             r#type: r#type.clone(),
             declaration_token: token.clone(),
             identifier_token: identifier.clone(),
-            last_assignment_token: assignment.clone(),
-            read: true,
+            used: false,
         };
 
         let instruction = match self.parse_expression(true, true) {
@@ -524,9 +498,12 @@ impl Parser {
 
         match instruction.r#type {
             InstructionType::Variable(ref instruction_variable) => {
-                if variable.name == instruction_variable.name {
-                    ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
-                        .print(self.args.disable_warnings);
+                if variable == instruction_variable {
+                    ParseWarning::new(
+                        ParseWarningType::SelfAssignment,
+                        variable.identifier_token.clone(),
+                    )
+                    .print(self.args.disable_warnings);
                 }
             }
             _ => (),

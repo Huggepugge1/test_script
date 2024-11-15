@@ -46,9 +46,20 @@ impl ParseEnvironment {
 
     fn check_unused(&self) {
         for variable in &self.variables[self.variables.len() - 1] {
-            if !variable.1.used && variable.1.name.chars().nth(0).unwrap() != '_' {
-                ParseWarning::new(ParseWarningType::UnusedVariable, variable.1.token.clone())
+            if !variable.1.read && variable.1.name.chars().nth(0).unwrap() != '_' {
+                if variable.1.declaration_token != variable.1.last_assignment_token {
+                    ParseWarning::new(
+                        ParseWarningType::VariableNotRead,
+                        variable.1.last_assignment_token.clone(),
+                    )
                     .print(self.args.disable_warnings);
+                } else {
+                    ParseWarning::new(
+                        ParseWarningType::UnusedVariable,
+                        variable.1.identifier_token.clone(),
+                    )
+                    .print(self.args.disable_warnings);
+                }
             }
         }
     }

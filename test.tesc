@@ -1,15 +1,10 @@
 test1("./input_test") {
-    if true {
-        println("Hello, World");
-    }
+    let str: string = "Hello, World";
+    println(str);
+    let strIsCool: string = "Wow, how cool!";
+    println(strIsCool);
 
-    let _str: string = if 1 != 1 {
-        "string";
-    } else {
-        1;
-    }
-
-    const quit: string = "q";
-    input(quit);
-    output(quit);
+    const quitThisBitch: string = "q";
+    input(quitThisBitch);
+    output(quitThisBitch);
 }

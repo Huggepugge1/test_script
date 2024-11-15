@@ -72,7 +72,7 @@ impl TypeChecker {
 
             InstructionType::Variable(variable) => {
                 let mut variable = self.environment.get(&variable.name).unwrap().clone();
-                variable.used = true;
+                variable.read = true;
                 self.environment.insert(variable.clone());
                 Ok(variable.r#type)
             }
@@ -223,7 +223,14 @@ impl TypeChecker {
             ));
         }
 
-        self.environment.insert(variable.clone());
+        let mut variable = match self.environment.get(&variable.name) {
+            Some(v) => v.clone(),
+            None => variable.clone(),
+        };
+        variable.read = false;
+        variable.last_assignment_token = instruction.token.clone();
+
+        self.environment.insert(variable);
         Ok(Type::None)
     }
 
