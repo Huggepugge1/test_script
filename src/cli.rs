@@ -12,6 +12,12 @@ pub struct Args {
     #[clap(short = 'W', long)]
     pub disable_warnings: bool,
 
+    #[clap(short = 'S', long)]
+    pub disable_style_warnings: bool,
+
+    #[clap(short = 'M', long)]
+    pub disable_magic_warnings: bool,
+
     #[clap(short, long, default_value = "3")]
     pub max_size: u32,
 }

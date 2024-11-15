@@ -534,6 +534,7 @@ impl Test {
             InstructionType::Assignment {
                 variable,
                 instruction,
+                ..
             } => self.interpret_assignment(variable, *instruction)?,
             InstructionType::Variable(var) => self.interpret_variable(var)?,
 

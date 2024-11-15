@@ -4,6 +4,7 @@ use crate::token::{PrintStyle, Token, TokenType};
 use crate::variable::Variable;
 
 use colored::Colorize;
+use convert_case::{Case, Casing};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
@@ -40,11 +41,28 @@ impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseErrorType::UnexpectedToken(token) => {
+                let token = match token {
+                    TokenType::Semicolon
+                    | TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock
+                    | TokenType::Colon
+                    | TokenType::Type { .. } => format!("`{token}`"),
+                    _ => format!("{token}"),
+                };
                 write!(f, "Unexpected token: {}", token)
             }
 
             ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
             ParseErrorType::UnclosedDelimiter(token) => {
+                let token = match token {
+                    TokenType::OpenParen
+                    | TokenType::CloseParen
+                    | TokenType::OpenBlock
+                    | TokenType::CloseBlock => format!("`{token}`"),
+                    _ => unreachable!(),
+                };
                 write!(f, "Unclosed delimiter: {}", token)
             }
 
@@ -134,16 +152,15 @@ impl ParseError {
                         "{}{}              \n\
                          In: {}:{}:{}      \n\
                          {}                \n\
-                                           \n\
                          {}                \n",
                         "error: ".bright_red(),
                         self.r#type,
-                        self.token.file,
-                        self.token.row,
-                        self.token.column,
+                        last_token.file,
+                        last_token.row,
+                        last_token.column + last_token.len(),
                         last_token
                             .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
-                        self.token.as_string(PrintStyle::Error),
+                        self.token.as_string(PrintStyle::Help("unexpected token")),
                     )
                 }
                 None => {
@@ -160,27 +177,27 @@ impl ParseError {
                     )
                 }
             },
-            ParseErrorType::ConstantReassignment(var) => eprintln!(
-                "{}{}              \n\
-                 In: {}:{}:{}      \n\
-                 {}                \n\
-                                   \n\
-                 {}                \n",
-                "error: ".bright_red(),
-                self.r#type,
-                self.token.file,
-                self.token.row,
-                self.token.column,
-                var.token
-                    .as_string(PrintStyle::Help("consider changing to `let`")),
-                self.token.as_string(PrintStyle::Error),
-            ),
+            ParseErrorType::ConstantReassignment(var) => {
+                eprintln!(
+                    "{}{}              \n\
+                     In: {}:{}:{}      \n\
+                     {}                \n\
+                     {}                \n",
+                    "error: ".bright_red(),
+                    self.r#type,
+                    self.token.file,
+                    var.declaration_token.row,
+                    var.declaration_token.column,
+                    var.declaration_token
+                        .as_string(PrintStyle::Help("consider changing to `let`")),
+                    self.token.as_string(PrintStyle::Error),
+                )
+            }
 
             ParseErrorType::VaribleTypeAnnotation => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n\
-                                   \n\
                  {}                \n",
                 "error: ".bright_red(),
                 self.r#type,
@@ -208,46 +225,190 @@ impl ParseError {
     }
 }
 
-pub enum ParseWarningType {
+pub enum ParseWarningType<'a> {
     TrailingSemicolon,
+    EmptyBlock,
+
+    UnusedValue,
+    UnusedVariable,
+    VariableNotRead,
+
+    ConstantNotUpperCase(String),
+    VariableNotSnakeCase(String),
+
+    SelfAssignment,
+
+    NoBlock(&'a Token),
+
+    MagicLiteral,
 }
 
-pub struct ParseWarning {
-    pub r#type: ParseWarningType,
+pub struct ParseWarning<'a> {
+    pub r#type: ParseWarningType<'a>,
     pub token: Token,
-    pub hint: String,
 }
 
-impl std::fmt::Display for ParseWarningType {
+impl<'a> std::fmt::Display for ParseWarningType<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
+            ParseWarningType::EmptyBlock => write!(f, "Empty block"),
+            ParseWarningType::UnusedValue => write!(f, "Unused value"),
+            ParseWarningType::UnusedVariable => write!(f, "Unused variable"),
+            ParseWarningType::VariableNotRead => {
+                write!(f, "Variable is not read after assignment")
+            }
+            ParseWarningType::ConstantNotUpperCase(_identifier) => {
+                write!(f, "Constants should be in UPPER_SNAKE_CASE")
+            }
+            ParseWarningType::VariableNotSnakeCase(_identifier) => {
+                write!(f, "Variables should be in snake_case")
+            }
+            ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
+            ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
+            ParseWarningType::MagicLiteral => write!(f, "Magic number detected"),
         }
     }
 }
 
-impl ParseWarning {
-    pub fn new(r#type: ParseWarningType, token: Token, hint: impl Into<String>) -> ParseWarning {
-        ParseWarning {
-            r#type,
-            token,
-            hint: hint.into(),
-        }
+impl<'a> ParseWarning<'a> {
+    pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
+        ParseWarning { r#type, token }
     }
 
     pub fn print(&self, disable_warnings: bool) {
         if disable_warnings {
             return;
         }
-        eprintln!(
-            "{}{}              \n\
-                               \n\
-             {} {}              \n",
-            "warning: ".bright_yellow(),
-            self.r#type,
-            self.token.as_string(PrintStyle::Warning),
-            "remove this semicolon".bright_yellow(),
-        );
+        match &self.r#type {
+            ParseWarningType::TrailingSemicolon => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "remove this semicolon".bright_yellow(),
+            ),
+            ParseWarningType::EmptyBlock => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "remove this block".bright_yellow(),
+            ),
+            ParseWarningType::UnusedValue => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+            ParseWarningType::UnusedVariable => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "prefix with `_` to suppress this warning".bright_yellow(),
+            ),
+            ParseWarningType::VariableNotRead => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+            ParseWarningType::ConstantNotUpperCase(identifier) => {
+                let new_name = identifier.to_case(Case::UpperSnake);
+                eprintln!(
+                    "{}{}              \n\
+                     In: {}:{}:{}      \n\
+                     {} {}             \n",
+                    "warning: ".bright_yellow(),
+                    self.r#type,
+                    self.token.file,
+                    self.token.row,
+                    self.token.column,
+                    self.token.as_string(PrintStyle::Warning),
+                    format!("consider changing the name to {new_name}").bright_yellow(),
+                )
+            }
+            ParseWarningType::VariableNotSnakeCase(identifier) => {
+                let new_name = identifier.to_case(Case::Snake);
+                eprintln!(
+                    "{}{}              \n\
+                     In: {}:{}:{}      \n\
+                     {} {}             \n",
+                    "warning: ".bright_yellow(),
+                    self.r#type,
+                    self.token.file,
+                    self.token.row,
+                    self.token.column,
+                    self.token.as_string(PrintStyle::Warning),
+                    format!("consider changing the name to {new_name}").bright_yellow(),
+                )
+            }
+            ParseWarningType::SelfAssignment => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {}                \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+            ),
+            ParseWarningType::NoBlock(token) => match &self.token.last_token {
+                Some(last_token) => {
+                    eprintln!(
+                        "{}{}              \n\
+                             In: {}:{}:{}      \n\
+                             {}                \n",
+                        "warning: ".bright_yellow(),
+                        self.r#type,
+                        last_token.file,
+                        last_token.row,
+                        last_token.column + last_token.len(),
+                        last_token.wrap_in_block(token),
+                    )
+                }
+                _ => unreachable!(),
+            },
+            ParseWarningType::MagicLiteral => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "consider using a named constant".bright_yellow(),
+            ),
+        }
     }
 }
 
