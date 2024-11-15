@@ -1,209 +1,341 @@
+use crate::cli::Args;
+use crate::r#type::Type;
 use crate::token::{Token, TokenCollection, TokenType};
 
+use std::path::PathBuf;
+
 pub struct Lexer<'a> {
+    lines: Vec<String>,
     contents: std::iter::Peekable<std::str::Chars<'a>>,
+    file: PathBuf,
+    tokens: Vec<Token>,
+
+    row: u32,
+    column: u32,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(contents: &'a mut String) -> Lexer<'a> {
-        let peekable = contents.chars().peekable().to_owned();
+    pub fn new(contents: &'a mut String, args: Args) -> Lexer<'a> {
+        let lines = contents.lines().map(|s| s.to_string()).collect();
+        let contents = contents.chars().peekable().to_owned().clone();
+
+        let row = 1;
+        let column = 1;
+
+        let tokens = Vec::new();
+
         Lexer {
-            contents: peekable.clone(),
+            lines,
+            contents,
+            file: args.file,
+            tokens,
+
+            row,
+            column,
         }
+    }
+
+    fn make_token(&self, r#type: TokenType) -> Token {
+        Token {
+            r#type,
+            file: self.file.to_str().unwrap().to_string(),
+            row: self.row,
+            column: self.column,
+
+            line: self.get_line(),
+            last_token: match self.tokens.last() {
+                Some(token) => Some(Box::new(token.clone())),
+                None => None,
+            },
+        }
+    }
+
+    fn get_line(&self) -> String {
+        self.lines[self.row as usize - 1].clone()
     }
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
-            "for" | "let" | "const" => TokenType::Keyword,
-            "string" | "regex" | "int" => TokenType::Type,
-            "in" => TokenType::AssignmentOperator,
+            "for" | "let" | "const" | "if" | "else" => TokenType::Keyword {
+                value: value.to_string(),
+            },
+            "string" | "regex" | "int" | "bool" => TokenType::Type {
+                value: Type::from(value),
+            },
+            "true" | "false" => TokenType::BooleanLiteral {
+                value: value.parse::<bool>().unwrap(),
+            },
+            "in" => TokenType::IterableAssignmentOperator,
             "as" => TokenType::TypeCast,
-            "input" | "output" | "print" | "println" => TokenType::BuiltIn,
-            _ => TokenType::Identifier,
+            "input" | "output" | "print" | "println" => TokenType::BuiltIn {
+                value: value.to_string(),
+            },
+            _ => TokenType::Identifier {
+                value: value.to_string(),
+            },
         }
     }
 
-    pub fn tokenize_identifier(&mut self, line: u32, column: &mut u32) -> Token {
-        let start_column = column.clone();
+    pub fn tokenize_identifier(&mut self) -> Token {
+        let mut length = 0;
         let mut current = String::new();
+
         while let Some(next) = self.contents.peek() {
             if !(next.is_alphanumeric() || *next == '_') {
                 break;
             }
             current.push(*next);
             self.contents.next();
-            *column += 1;
+            length += 1;
         }
 
-        Token::new(self.identifier_type(&current), &current, line, start_column)
+        let token_type = self.identifier_type(&current);
+        let token = self.make_token(token_type);
+        self.column += length;
+        token
     }
 
-    pub fn tokenize_string_literal(&mut self, line: &mut u32, column: &mut u32) -> Token {
-        let start_line = line.clone();
-        let start_column = column.clone();
+    pub fn tokenize_string_literal(&mut self) -> Token {
+        let mut new_row = self.row;
+        let mut new_column = self.column + 1;
+        let mut current = String::from("\"");
+
         self.contents.next();
 
-        let mut current = String::new();
-        while let Some(next) = self.contents.next() {
-            if next == '\n' {
-                *line += 1;
-                *column = 1;
+        while let Some(next) = self.contents.peek() {
+            if *next == '\n' {
+                new_row += 1;
+                new_column = 1;
             }
-            if next == '"' {
+            current.push(*next);
+            new_column += 1;
+            if *next == '"' {
                 break;
             }
-            current.push(next);
-            *column += 1;
+            self.contents.next();
         }
 
-        Token::new(TokenType::StringLiteral, &current, start_line, start_column)
+        self.contents.next();
+
+        let token = self.make_token(TokenType::StringLiteral { value: current });
+        self.row = new_row;
+        self.column = new_column;
+        token
     }
 
-    pub fn tokenize_regex_literal(&mut self, line: &mut u32, column: &mut u32) -> Token {
-        let start_line = line.clone();
-        let start_column = column.clone();
+    pub fn tokenize_regex_literal(&mut self) -> Token {
+        let mut new_row = self.row;
+        let mut new_column = self.column + 1;
+        let mut current = String::from("`");
+
         self.contents.next();
 
-        let mut current = String::new();
-        while let Some(next) = self.contents.next() {
-            if next == '\n' {
-                *line += 1;
-                *column = 1;
+        while let Some(next) = self.contents.peek() {
+            if *next == '\n' {
+                new_row += 1;
+                new_column = 1;
             }
-            if next == '`' {
+            current.push(*next);
+            new_column += 1;
+            if *next == '`' {
                 break;
             }
-            current.push(next);
-            *column += 1;
+            self.contents.next();
         }
 
-        Token::new(TokenType::RegexLiteral, &current, start_line, start_column)
+        self.contents.next();
+
+        let token = self.make_token(TokenType::RegexLiteral { value: current });
+        self.row = new_row;
+        self.column = new_column;
+        token
+    }
+
+    pub fn tokenize_integer_literal(&mut self) -> Token {
+        let mut length = 0;
+        let mut current = String::new();
+        while let Some(next) = self.contents.peek() {
+            if !next.is_ascii_digit() {
+                break;
+            }
+            current.push(*next);
+            self.contents.next();
+            length += 1;
+        }
+
+        let token = self.make_token(TokenType::IntegerLiteral {
+            value: current.parse::<i64>().unwrap(),
+        });
+        self.column += length;
+        token
     }
 
     pub fn tokenize(&mut self) -> TokenCollection {
-        let mut line = 1;
-        let mut column = 1;
-
-        let mut tokens = Vec::new();
-
         while let Some(c) = self.contents.peek() {
             match c {
-                '{' => tokens.push(Token::new(
-                    TokenType::OpenBlock,
-                    &"{".to_string(),
-                    line,
-                    column,
-                )),
-                '}' => tokens.push(Token::new(
-                    TokenType::CloseBlock,
-                    &"}".to_string(),
-                    line,
-                    column,
-                )),
-                '(' => tokens.push(Token::new(
-                    TokenType::OpenParen,
-                    &"(".to_string(),
-                    line,
-                    column,
-                )),
-                ')' => tokens.push(Token::new(
-                    TokenType::CloseParen,
-                    &")".to_string(),
-                    line,
-                    column,
-                )),
-                ';' => tokens.push(Token::new(
-                    TokenType::Semicolon,
-                    &";".to_string(),
-                    line,
-                    column,
-                )),
-                '+' => tokens.push(Token::new(
-                    TokenType::BinaryOperator,
-                    &"+".to_string(),
-                    line,
-                    column,
-                )),
-                '-' => tokens.push(Token::new(
-                    TokenType::BinaryOperator,
-                    &"-".to_string(),
-                    line,
-                    column,
-                )),
-                '*' => tokens.push(Token::new(
-                    TokenType::BinaryOperator,
-                    &"*".to_string(),
-                    line,
-                    column,
-                )),
+                '{' => self.tokens.push(self.make_token(TokenType::OpenBlock)),
+                '}' => self.tokens.push(self.make_token(TokenType::CloseBlock)),
+                '(' => self.tokens.push(self.make_token(TokenType::OpenParen)),
+                ')' => self.tokens.push(self.make_token(TokenType::CloseParen)),
+                ';' => self.tokens.push(self.make_token(TokenType::Semicolon)),
+                '+' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "+".to_string(),
+                })),
+                '-' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "-".to_string(),
+                })),
+                '*' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "*".to_string(),
+                })),
                 '/' => {
+                    self.contents.next();
                     if let Some('/') = self.contents.peek() {
                         while let Some(next) = self.contents.next() {
                             if next == '\n' {
                                 break;
                             }
-                            column += 1;
                         }
                     } else {
-                        tokens.push(Token::new(
-                            TokenType::BinaryOperator,
-                            &"/".to_string(),
-                            line,
-                            column,
-                        ))
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "/".to_string(),
+                        }));
+                        self.column += 1;
+                        continue;
                     }
-                }
-                ':' => tokens.push(Token::new(TokenType::Colon, &":".to_string(), line, column)),
-                '=' => tokens.push(Token::new(
-                    TokenType::AssignmentOperator,
-                    &"=".to_string(),
-                    line,
-                    column,
-                )),
-                'a'..='z' | 'A'..='Z' | '_' => {
-                    tokens.push(self.tokenize_identifier(line, &mut column));
+                    self.column = 1;
+                    self.row += 1;
                     continue;
                 }
-                '0'..='9' => {
-                    let start_column = column.clone();
-                    let mut current = String::new();
-                    while let Some(next) = self.contents.peek() {
-                        if !next.is_numeric() {
-                            break;
-                        }
-                        current.push(*next);
+                ':' => self.tokens.push(self.make_token(TokenType::Colon)),
+                '<' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('=') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "<=".to_string(),
+                        }));
+                        length += 1;
                         self.contents.next();
-                        column += 1;
+                    } else {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "<".to_string(),
+                        }));
                     }
-                    tokens.push(Token::new(
-                        TokenType::IntegerLiteral,
-                        &current,
-                        line,
-                        start_column,
-                    ));
+                    self.column += length;
                     continue;
                 }
-                '`' => {
-                    tokens.push(self.tokenize_regex_literal(&mut line, &mut column));
+                '>' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('=') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: ">=".to_string(),
+                        }));
+                        length += 1;
+                        self.contents.next();
+                    } else {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: ">".to_string(),
+                        }));
+                    }
+                    self.column += length;
+                }
+                '=' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('=') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "==".to_string(),
+                        }));
+                        length += 1;
+                        self.contents.next();
+                    } else {
+                        self.tokens
+                            .push(self.make_token(TokenType::AssignmentOperator));
+                    }
+                    self.column += length;
+                    continue;
+                }
+                '!' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('=') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "!=".to_string(),
+                        }));
+                        length += 1;
+                        self.contents.next();
+                    } else {
+                        self.tokens.push(self.make_token(TokenType::UnaryOperator {
+                            value: "!".to_string(),
+                        }));
+                    }
+                    self.column += length;
+                    continue;
+                }
+                '&' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('&') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "&&".to_string(),
+                        }));
+                        length += 1;
+                        self.contents.next();
+                    } else {
+                        panic!("Unexpected character: \"&\"");
+                    }
+                    self.column += length;
+                    continue;
+                }
+                '|' => {
+                    self.contents.next();
+                    let mut length = 1;
+                    if let Some('|') = self.contents.peek() {
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "||".to_string(),
+                        }));
+                        length += 1;
+                        self.contents.next();
+                    } else {
+                        panic!("Unexpected character: \"|\"");
+                    }
+                    self.column += length;
+                    continue;
+                }
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let token = self.tokenize_identifier();
+                    self.tokens.push(token);
                     continue;
                 }
                 '"' => {
-                    tokens.push(self.tokenize_string_literal(&mut line, &mut column));
+                    let token = self.tokenize_string_literal();
+                    self.tokens.push(token);
+                    continue;
+                }
+                '`' => {
+                    let token = self.tokenize_regex_literal();
+                    self.tokens.push(token);
+                    continue;
+                }
+                '0'..='9' => {
+                    let token = self.tokenize_integer_literal();
+                    self.tokens.push(token);
                     continue;
                 }
                 '\n' => {
-                    line += 1;
-                    column = 1;
+                    self.row += 1;
+                    self.column = 1;
                     self.contents.next();
                     continue;
                 }
                 ' ' | '\t' => (),
                 _ => panic!("Unexpected character: \"{}\"", c),
             }
-            column += 1;
+            self.column += 1;
             self.contents.next();
         }
 
-        TokenCollection::new(tokens)
+        TokenCollection::new(self.tokens.clone())
     }
 }
