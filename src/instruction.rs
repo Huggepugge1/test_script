@@ -149,6 +149,7 @@ impl std::fmt::Display for Instruction {
                 InstructionType::Assignment {
                     ref variable,
                     ref instruction,
+                    ..
                 } => format!("{} = {}", variable, instruction),
                 InstructionType::IterableAssignment(ref variable, ref instruction) => {
                     format!("{} in {}", variable, instruction)
@@ -193,6 +194,20 @@ impl Instruction {
     pub fn new(r#type: InstructionType, token: Token) -> Self {
         Self { r#type, token }
     }
+
+    pub fn inner_most(&self) -> &Self {
+        match &self.r#type {
+            InstructionType::Block(ref instructions) => {
+                if instructions.is_empty() {
+                    self
+                } else {
+                    instructions.last().unwrap().inner_most()
+                }
+            }
+            InstructionType::Paren(ref instruction) => instruction.inner_most(),
+            _ => self,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -218,6 +233,7 @@ pub enum InstructionType {
     Assignment {
         variable: Variable,
         instruction: Box<Instruction>,
+        token: Token,
     },
     IterableAssignment(Variable, Box<Instruction>),
     Variable(Variable),

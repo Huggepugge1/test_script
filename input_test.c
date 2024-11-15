@@ -11,5 +11,7 @@ int main() {
             break;
         }
     }
-    free(a);
+    if (1) {
+        printf("%s", a);
+    } else
 }

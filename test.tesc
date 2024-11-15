@@ -1,7 +1,7 @@
 test1("./input_test") {
-    let quit: int = "q";
-    quit = "send";
+    let number: int = 154223;
 
-    input(quit);
-    output(quit);
+    const QUIT_THIS_BITCH: string = "q";
+    input(QUIT_THIS_BITCH);
+    output(QUIT_THIS_BITCH);
 }
