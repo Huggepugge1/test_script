@@ -10,8 +10,6 @@ sudo apt update
 sudo apt install test-script
 ```
 
-To update, run `sudo apt update && sudo apt install test-script`
-
 ## Building
 Clone the repo and run `cargo build --release`.
 
