@@ -1,6 +1,12 @@
 test1("./input_test") {
-    let quit: string = "q";
+    if true {
+        println("Hello, World");
+    }
 
+    let _: string = {
+        "string";
+    }
+    const quit: string = "q";
     input(quit);
     output(quit);
 }

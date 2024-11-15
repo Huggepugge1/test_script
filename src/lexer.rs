@@ -10,8 +10,8 @@ pub struct Lexer<'a> {
     file: PathBuf,
     tokens: Vec<Token>,
 
-    row: u32,
-    column: u32,
+    row: usize,
+    column: usize,
 }
 
 impl<'a> Lexer<'a> {
