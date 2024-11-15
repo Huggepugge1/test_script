@@ -151,14 +151,17 @@ impl ParseError {
                     eprintln!(
                         "{}{}              \n\
                          In: {}:{}:{}      \n\
+                         {}                \n\
+                                           \n\
                          {}                \n",
                         "error: ".bright_red(),
                         self.r#type,
-                        last_token.file,
+                        self.token.file,
                         last_token.row,
                         last_token.column + last_token.len(),
                         last_token
                             .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
+                        self.token.as_string(PrintStyle::Error),
                     )
                 }
                 None => {
@@ -349,9 +352,6 @@ impl ParseWarning {
                                        \n\
                      {} {}             \n",
                     "warning: ".bright_yellow(),
-                    self.token.file,
-                    self.token.row,
-                    self.token.column,
                     self.r#type,
                     self.token.as_string(PrintStyle::Warning),
                     format!("consider changing the name to {new_name}").bright_yellow(),
@@ -365,9 +365,6 @@ impl ParseWarning {
                                        \n\
                      {} {}             \n",
                     "warning: ".bright_yellow(),
-                    self.token.file,
-                    self.token.row,
-                    self.token.column,
                     self.r#type,
                     self.token.as_string(PrintStyle::Warning),
                     format!("consider changing the name to {new_name}").bright_yellow(),
@@ -379,45 +376,25 @@ impl ParseWarning {
                                    \n\
                  {}                \n",
                 "warning: ".bright_yellow(),
-                self.token.file,
-                self.token.row,
-                self.token.column,
                 self.r#type,
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::NoBlock => match &self.token.last_token {
                 Some(last_token) => {
-                    let close_block_indentation = last_token
-                        .line
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .collect::<String>();
-                    println!("{:?}", close_block_indentation);
-
-                    let close_block = Token {
-                        r#type: TokenType::None,
-                        file: self.token.file.clone(),
-                        row: self.token.row + 1,
-                        column: close_block_indentation.len() + 1,
-                        line: close_block_indentation,
-                        last_token: None,
-                    };
                     eprintln!(
                         "{}{}              \n\
-                             In: {}:{}:{}      \n\
-                             {}                \n\
-                                               \n\
-                             {}                \n\
-                             {}                \n",
+                         In: {}:{}:{}      \n\
+                         {}                \n\
+                                           \n\
+                         {}                \n",
                         "warning: ".bright_yellow(),
                         self.r#type,
-                        last_token.file,
+                        self.token.file,
                         last_token.row,
                         last_token.column + last_token.len(),
-                        last_token.insert_tokens(vec![TokenType::OpenBlock], "add a block here"),
-                        self.token.as_string(PrintStyle::Warning),
-                        close_block
-                            .insert_tokens(vec![TokenType::CloseBlock], "close the block here"),
+                        last_token
+                            .insert_tokens(vec![TokenType::Semicolon], "add a semicolon here"),
+                        self.token.as_string(PrintStyle::Error),
                     )
                 }
                 _ => unreachable!(),

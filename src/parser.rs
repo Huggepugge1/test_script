@@ -637,7 +637,9 @@ impl Parser {
     fn parse_conditional(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let condition = self.parse_expression(true, true)?;
-        let statement = self.parse_expression(true, true)?;
+        println!("{:?}", condition);
+        let statement = self.parse_statement()?;
+        println!("{:?}", statement);
         match statement.r#type {
             InstructionType::Block(_) => {
                 self.tokens.next();
@@ -649,7 +651,8 @@ impl Parser {
                     self.tokens.current().unwrap(),
                 ));
             }
-            _ => (),
+            _ => ParseWarning::new(ParseWarningType::NoBlock, statement.token.clone())
+                .print(self.args.disable_warnings),
         }
         let r#else = match &self.peek_next_token()?.r#type {
             TokenType::Keyword { value } => match value.as_str() {

@@ -177,9 +177,13 @@ impl Token {
         );
         let padding = &" ".repeat(padding_length + token_len);
 
-        let token_string = tokens
+        let mut token_string = tokens
             .iter()
             .fold(String::new(), |acc, token| acc + &format!("{} ", token));
+
+        if tokens[0] == TokenType::OpenBlock {
+            token_string = " ".to_string() + &token_string;
+        }
 
         let new_line = self.line[0..token_len].to_string()
             + &token_string[..token_string.len() - 1]

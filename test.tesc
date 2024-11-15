@@ -1,8 +1,11 @@
 test1("./input_test") {
-    let str: string = "Hello, World";
-    println(str);
-    let strIsCool: string = "Wow, how cool!";
-    println(strIsCool);
+    if true {
+        println("This is true");
+    } else {
+        println("This is false");
+    }
+
+    if true println("This is true"); else println("This is false");
 
     const quitThisBitch: string = "q";
     input(quitThisBitch);

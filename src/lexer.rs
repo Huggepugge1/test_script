@@ -44,7 +44,11 @@ impl<'a> Lexer<'a> {
 
             line: self.get_line(),
             last_token: match self.tokens.last() {
-                Some(token) => Some(Box::new(token.clone())),
+                Some(token) => {
+                    let mut token = token.clone();
+                    token.last_token = None;
+                    Some(Box::new(token))
+                }
                 None => None,
             },
         }
