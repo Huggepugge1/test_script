@@ -225,7 +225,7 @@ impl ParseError {
     }
 }
 
-pub enum ParseWarningType {
+pub enum ParseWarningType<'a> {
     TrailingSemicolon,
     EmptyBlock,
 
@@ -238,15 +238,15 @@ pub enum ParseWarningType {
 
     SelfAssignment,
 
-    NoBlock,
+    NoBlock(&'a Token),
 }
 
-pub struct ParseWarning {
-    pub r#type: ParseWarningType,
+pub struct ParseWarning<'a> {
+    pub r#type: ParseWarningType<'a>,
     pub token: Token,
 }
 
-impl std::fmt::Display for ParseWarningType {
+impl<'a> std::fmt::Display for ParseWarningType<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
@@ -262,13 +262,13 @@ impl std::fmt::Display for ParseWarningType {
             ParseWarningType::VariableNotSnakeCase(_identifier) => {
                 write!(f, "Variables should be in snake_case")
             }
-            ParseWarningType::NoBlock => write!(f, "A block should be used here"),
+            ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
             ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
         }
     }
 }
 
-impl ParseWarning {
+impl<'a> ParseWarning<'a> {
     pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
         ParseWarning { r#type, token }
     }
@@ -385,39 +385,18 @@ impl ParseWarning {
                 self.r#type,
                 self.token.as_string(PrintStyle::Warning),
             ),
-            ParseWarningType::NoBlock => match &self.token.last_token {
+            ParseWarningType::NoBlock(token) => match &self.token.last_token {
                 Some(last_token) => {
-                    let close_block_indentation = last_token
-                        .line
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .collect::<String>();
-                    println!("{:?}", close_block_indentation);
-
-                    let close_block = Token {
-                        r#type: TokenType::None,
-                        file: self.token.file.clone(),
-                        row: self.token.row + 1,
-                        column: close_block_indentation.len() + 1,
-                        line: close_block_indentation,
-                        last_token: None,
-                    };
                     eprintln!(
                         "{}{}              \n\
                              In: {}:{}:{}      \n\
-                             {}                \n\
-                                               \n\
-                             {}                \n\
                              {}                \n",
                         "warning: ".bright_yellow(),
                         self.r#type,
                         last_token.file,
                         last_token.row,
                         last_token.column + last_token.len(),
-                        last_token.insert_tokens(vec![TokenType::OpenBlock], "add a block here"),
-                        self.token.as_string(PrintStyle::Warning),
-                        close_block
-                            .insert_tokens(vec![TokenType::CloseBlock], "close the block here"),
+                        last_token.wrap_in_block(token),
                     )
                 }
                 _ => unreachable!(),

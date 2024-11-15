@@ -181,7 +181,7 @@ impl Token {
             .iter()
             .fold(String::new(), |acc, token| acc + &format!("{} ", token));
 
-        if tokens[0] == TokenType::OpenBlock {
+        if tokens[0] == TokenType::OpenBlock || tokens[0] == TokenType::CloseBlock {
             token_string = " ".to_string() + &token_string;
         }
 
@@ -202,6 +202,93 @@ impl Token {
             "+".repeat(token_string.len() - 1).bright_green(),
             message.bright_green()
         )
+    }
+
+    pub fn wrap_in_block(&self, close_token: &Token) -> String {
+        let token_len = self.column as usize + self.len();
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
+        let line_padding = " ".repeat(self.line.chars().take_while(|c| c.is_whitespace()).count());
+
+        let start_line = self.line[..token_len].to_string() + "{";
+        let start_line_padding = &" ".repeat(padding_length + token_len);
+
+        let content_line = line_padding.clone()
+            + "    "
+            + &(if self.row == close_token.row {
+                self.line[token_len..close_token.column as usize].to_string()
+            } else {
+                self.line[token_len..].to_string()
+            });
+
+        let end_block_line = line_padding.clone() + "}";
+        let end_block_padding = line_padding.clone() + &" ".repeat(padding_length);
+
+        let close_token_len = close_token.column as usize + close_token.len();
+        let after_line = if close_token_len < close_token.line.len() {
+            Some(line_padding + &close_token.line[close_token_len..])
+        } else {
+            None
+        };
+
+        let start_line = format!(
+            "{:<4}{} \n\
+             {}{}    \n",
+            self.row.to_string().color(colored::Color::TrueColor {
+                r: 0x9F,
+                g: 0xFE,
+                b: 0xBF,
+            }),
+            &start_line,
+            start_line_padding,
+            "+ open the block here".bright_green()
+        );
+        let content_line = format!(
+            "{:<4}{} \n",
+            (self.row + 1).to_string().color(colored::Color::TrueColor {
+                r: 0x9F,
+                g: 0xFE,
+                b: 0xBF,
+            }),
+            &content_line,
+        );
+        let end_block_line = format!(
+            "{:<4}{} \n\
+             {}{}    \n",
+            (usize::max(self.row + 2, close_token.row + 1))
+                .to_string()
+                .color(colored::Color::TrueColor {
+                    r: 0x9F,
+                    g: 0xFE,
+                    b: 0xBF,
+                }),
+            &end_block_line,
+            end_block_padding,
+            "+ close the block here".bright_green()
+        );
+        match after_line {
+            Some(after_line) => {
+                let after_line = format!(
+                    "{:<4}{} \n",
+                    (usize::max(self.row + 3, close_token.row + 1))
+                        .to_string()
+                        .color(colored::Color::TrueColor {
+                            r: 0x9F,
+                            g: 0xFE,
+                            b: 0xBF,
+                        }),
+                    &after_line,
+                );
+
+                format!(
+                    "{}\n{}\n{}\n{}\n",
+                    start_line, content_line, end_block_line, after_line
+                )
+            }
+            None => format!("{}\n{}\n{}\n", start_line, content_line, end_block_line),
+        }
     }
 }
 
@@ -268,6 +355,14 @@ impl TokenCollection {
                 self.back();
                 break;
             }
+        }
+    }
+
+    pub fn last(&self) -> Option<Token> {
+        if self.index == 0 {
+            None
+        } else {
+            Some(self.tokens[self.index - 1].clone())
         }
     }
 }

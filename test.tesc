@@ -1,8 +1,6 @@
 test1("./input_test") {
-    if true {
-        println("This is true");
-    } else {
-        println("This is false");
+    for i: string in `\d` {
+        println("");
     }
 
     if true println("This is true"); else println("This is false");

@@ -637,13 +637,10 @@ impl Parser {
     fn parse_conditional(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         let condition = self.parse_expression(true, true)?;
-        println!("{:?}", condition);
         let statement = self.parse_statement()?;
-        println!("{:?}", statement);
+        println!("{:?}", self.tokens.last());
         match statement.r#type {
-            InstructionType::Block(_) => {
-                self.tokens.next();
-            }
+            InstructionType::Block(_) => (),
             InstructionType::None => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -651,14 +648,19 @@ impl Parser {
                     self.tokens.current().unwrap(),
                 ));
             }
-            _ => ParseWarning::new(ParseWarningType::NoBlock, statement.token.clone())
-                .print(self.args.disable_warnings),
+            _ => ParseWarning::new(
+                ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
+                statement.token.clone(),
+            )
+            .print(self.args.disable_warnings),
         }
         let r#else = match &self.peek_next_token()?.r#type {
             TokenType::Keyword { value } => match value.as_str() {
                 "else" => {
                     self.get_next_token()?;
-                    self.parse_expression(true, true)?
+                    let statement = self.parse_statement()?;
+                    self.tokens.back();
+                    statement
                 }
                 _ => {
                     self.tokens.back();
@@ -670,6 +672,18 @@ impl Parser {
                 Instruction::NONE
             }
         };
+
+        match r#else.r#type {
+            InstructionType::Block(_) => (),
+            InstructionType::None => (),
+            _ => {
+                ParseWarning::new(
+                    ParseWarningType::NoBlock(&self.tokens.peek().unwrap()),
+                    r#else.token.clone(),
+                )
+                .print(self.args.disable_warnings);
+            }
+        }
 
         Ok(Instruction::new(
             InstructionType::Conditional {
@@ -701,7 +715,21 @@ impl Parser {
 
         let statement = statement?;
 
-        self.tokens.back();
+        match statement.r#type {
+            InstructionType::Block(_) => self.tokens.back(),
+            InstructionType::None => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
+                    self.tokens.current().unwrap(),
+                ));
+            }
+            _ => ParseWarning::new(
+                ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
+                statement.token.clone(),
+            )
+            .print(self.args.disable_warnings),
+        }
         Ok(Instruction::new(
             InstructionType::For(Box::new(assignment), Box::new(statement)),
             token,
