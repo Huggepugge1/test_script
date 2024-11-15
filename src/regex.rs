@@ -64,15 +64,17 @@ fn parse_kind(kind: hir::HirKind, token: &Token, max: u32) -> Result<Vec<String>
         },
         hir::HirKind::Repetition(hir) => Ok(parse_repetiton(hir, token, max)?),
         hir::HirKind::Concat(hirs) => Ok(parse_concat(hirs, token, max)?),
-        _hir => Err(ParseError::new(
-            ParseErrorType::RegexError,
-            token.clone(),
-            "See documentation for more information",
-        )),
+        _hir => Err(ParseError::new(ParseErrorType::RegexError, token.clone())),
     }
 }
 
 pub fn parse(token: &Token, max: u32) -> Result<Vec<String>, ParseError> {
-    let kind = regex_syntax::parse(&token.value).unwrap().into_kind();
+    let value = match &token.r#type {
+        crate::token::TokenType::RegexLiteral { value } => value,
+        _ => unreachable!(),
+    };
+    let kind = regex_syntax::parse(&value[1..value.len() - 1])
+        .unwrap()
+        .into_kind();
     parse_kind(kind.clone(), token, max)
 }

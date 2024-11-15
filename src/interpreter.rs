@@ -12,7 +12,7 @@ pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
     Integer(i64),
-    Boolean(bool),
+    Bool(bool),
     None,
 }
 
@@ -22,7 +22,7 @@ impl std::fmt::Display for InstructionResult {
             InstructionResult::String(s) => write!(f, "{}", s),
             InstructionResult::Regex(s) => write!(f, "{:?}", s),
             InstructionResult::Integer(i) => write!(f, "{}", i),
-            InstructionResult::Boolean(b) => write!(f, "{}", b),
+            InstructionResult::Bool(b) => write!(f, "{}", b),
             InstructionResult::None => write!(f, "()"),
         }
     }
@@ -125,7 +125,7 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let value = self.interpret_instruction(instruction)?;
         match value {
-            InstructionResult::Boolean(value) => Ok(InstructionResult::Boolean(!value)),
+            InstructionResult::Bool(value) => Ok(InstructionResult::Bool(!value)),
             _ => {
                 unreachable!()
             }
@@ -250,7 +250,7 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let left = self.interpret_instruction(left)?;
         let right = self.interpret_instruction(right)?;
-        Ok(InstructionResult::Boolean(left == right))
+        Ok(InstructionResult::Bool(left == right))
     }
 
     fn interpret_not_equal(
@@ -260,7 +260,7 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let left = self.interpret_instruction(left)?;
         let right = self.interpret_instruction(right)?;
-        Ok(InstructionResult::Boolean(left != right))
+        Ok(InstructionResult::Bool(left != right))
     }
 
     fn interpret_greater_than(
@@ -272,7 +272,7 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
-                Ok(InstructionResult::Boolean(left > right))
+                Ok(InstructionResult::Bool(left > right))
             }
             _ => {
                 unreachable!()
@@ -289,7 +289,7 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
-                Ok(InstructionResult::Boolean(left >= right))
+                Ok(InstructionResult::Bool(left >= right))
             }
             _ => {
                 unreachable!()
@@ -306,7 +306,7 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
-                Ok(InstructionResult::Boolean(left < right))
+                Ok(InstructionResult::Bool(left < right))
             }
             _ => {
                 unreachable!()
@@ -323,7 +323,7 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
-                Ok(InstructionResult::Boolean(left <= right))
+                Ok(InstructionResult::Bool(left <= right))
             }
             _ => {
                 unreachable!()
@@ -339,8 +339,8 @@ impl Test {
         let left = self.interpret_instruction(left)?;
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
-            (InstructionResult::Boolean(left), InstructionResult::Boolean(right)) => {
-                Ok(InstructionResult::Boolean(left && right))
+            (InstructionResult::Bool(left), InstructionResult::Bool(right)) => {
+                Ok(InstructionResult::Bool(left && right))
             }
             _ => {
                 unreachable!()
@@ -356,8 +356,8 @@ impl Test {
         let left = self.interpret_instruction(left)?;
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
-            (InstructionResult::Boolean(left), InstructionResult::Boolean(right)) => {
-                Ok(InstructionResult::Boolean(left || right))
+            (InstructionResult::Bool(left), InstructionResult::Bool(right)) => {
+                Ok(InstructionResult::Bool(left || right))
             }
             _ => {
                 unreachable!()
@@ -421,8 +421,8 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let condition = self.interpret_instruction(condition)?;
         match condition {
-            InstructionResult::Boolean(true) => self.interpret_instruction(instruction),
-            InstructionResult::Boolean(false) => self.interpret_instruction(r#else),
+            InstructionResult::Bool(true) => self.interpret_instruction(instruction),
+            InstructionResult::Bool(false) => self.interpret_instruction(r#else),
             _ => {
                 unreachable!()
             }
@@ -495,6 +495,13 @@ impl Test {
             (InstructionResult::String(value), Type::Regex) => {
                 Ok(InstructionResult::Regex(vec![value]))
             }
+
+            (InstructionResult::String(value), Type::Bool) => {
+                Ok(InstructionResult::Bool(value == "true"))
+            }
+            (InstructionResult::Bool(value), Type::String) => {
+                Ok(InstructionResult::String(value.to_string()))
+            }
             _ => {
                 unreachable!()
             }
@@ -509,7 +516,7 @@ impl Test {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
             InstructionType::IntegerLiteral(value) => InstructionResult::Integer(value),
-            InstructionType::BooleanLiteral(value) => InstructionResult::Boolean(value),
+            InstructionType::BooleanLiteral(value) => InstructionResult::Bool(value),
 
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
 
