@@ -118,7 +118,6 @@ impl TypeChecker {
                 ParseWarning::new(
                     ParseWarningType::TrailingSemicolon,
                     instruction.token.clone(),
-                    "Remove the trailing semicolon",
                 )
                 .print(self.args.disable_warnings);
                 Ok(Type::None)

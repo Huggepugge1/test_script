@@ -215,7 +215,6 @@ pub enum ParseWarningType {
 pub struct ParseWarning {
     pub r#type: ParseWarningType,
     pub token: Token,
-    pub hint: String,
 }
 
 impl std::fmt::Display for ParseWarningType {
@@ -227,12 +226,8 @@ impl std::fmt::Display for ParseWarningType {
 }
 
 impl ParseWarning {
-    pub fn new(r#type: ParseWarningType, token: Token, hint: impl Into<String>) -> ParseWarning {
-        ParseWarning {
-            r#type,
-            token,
-            hint: hint.into(),
-        }
+    pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
+        ParseWarning { r#type, token }
     }
 
     pub fn print(&self, disable_warnings: bool) {
