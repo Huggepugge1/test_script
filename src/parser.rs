@@ -163,9 +163,10 @@ impl Parser {
 
         match &token.r#type {
             TokenType::StringLiteral { value } => {
+                let value = value[1..value.len() - 1].to_string();
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
-                    && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
+                    && !white_listed_constants::STRINGS.contains(&value.as_str())
                 {
                     if !self.args.disable_style_warnings {
                         ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
@@ -174,9 +175,7 @@ impl Parser {
                 }
 
                 Ok(Instruction::new(
-                    InstructionType::StringLiteral(
-                        value.to_string()[1..value.len() - 1].to_string(),
-                    ),
+                    InstructionType::StringLiteral(value),
                     token,
                 ))
             }
@@ -220,6 +219,7 @@ impl Parser {
                 "-" => BinaryOperator::Subtraction,
                 "*" => BinaryOperator::Multiplication,
                 "/" => BinaryOperator::Division,
+                "%" => BinaryOperator::Modulo,
                 "==" => BinaryOperator::Equal,
                 "!=" => BinaryOperator::NotEqual,
                 ">" => BinaryOperator::GreaterThan,

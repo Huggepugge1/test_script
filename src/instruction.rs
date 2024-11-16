@@ -18,6 +18,7 @@ pub enum BinaryOperator {
     Subtraction,
     Multiplication,
     Division,
+    Modulo,
 }
 
 impl std::fmt::Display for BinaryOperator {
@@ -40,6 +41,7 @@ impl std::fmt::Display for BinaryOperator {
                 BinaryOperator::Subtraction => "-",
                 BinaryOperator::Multiplication => "*",
                 BinaryOperator::Division => "/",
+                BinaryOperator::Modulo => "%",
             }
         )
     }
@@ -52,6 +54,7 @@ impl BinaryOperator {
             BinaryOperator::Subtraction => Self::Addition,
             BinaryOperator::Multiplication => Self::Multiplication,
             BinaryOperator::Division => Self::Multiplication,
+            BinaryOperator::Modulo => Self::Multiplication,
 
             BinaryOperator::Equal => Self::Equal,
             BinaryOperator::NotEqual => Self::Equal,

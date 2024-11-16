@@ -73,12 +73,13 @@ impl TypeChecker {
             }
 
             InstructionType::Variable(variable) => {
-                let mut variable = match self.environment.get(&variable.name) {
-                    Some(v) => v.clone(),
-                    None => variable.clone(),
+                let variable = match self.environment.get(&variable.name) {
+                    Some(v) => {
+                        v.read = true;
+                        v
+                    }
+                    None => variable,
                 };
-                variable.read = true;
-                self.environment.insert(variable.clone());
                 Ok(variable.r#type)
             }
 
@@ -313,6 +314,7 @@ impl TypeChecker {
             BinaryOperator::Subtraction => self.check_subtraction(left, right),
             BinaryOperator::Multiplication => self.check_multiplication(left, right),
             BinaryOperator::Division => self.check_division(left, right),
+            BinaryOperator::Modulo => self.check_modulo(left, right),
 
             BinaryOperator::Equal => self.check_comparison(operator, left, right),
             BinaryOperator::NotEqual => self.check_comparison(operator, left, right),
@@ -452,6 +454,33 @@ impl TypeChecker {
                 right.token.clone(),
             )),
 
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
+            )),
+        }
+    }
+
+    fn check_modulo(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+    ) -> Result<Type, ParseError> {
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
+
+        match (left_type, right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
             (t1, _t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
