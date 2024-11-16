@@ -155,7 +155,11 @@ impl std::fmt::Display for Instruction {
                     ref instruction,
                     ..
                 } => format!("{} = {}", variable, instruction),
-                InstructionType::IterableAssignment(ref variable, ref instruction) => {
+                InstructionType::IterableAssignment {
+                    ref variable,
+                    ref instruction,
+                    ..
+                } => {
                     format!("{} in {}", variable, instruction)
                 }
                 InstructionType::Variable(ref variable) => variable.to_string(),
@@ -239,8 +243,13 @@ pub enum InstructionType {
         variable: Variable,
         instruction: Box<Instruction>,
         token: Token,
+        declaration: bool,
     },
-    IterableAssignment(Variable, Box<Instruction>),
+    IterableAssignment {
+        variable: Variable,
+        instruction: Box<Instruction>,
+        token: Token,
+    },
     Variable(Variable),
 
     UnaryOperation {

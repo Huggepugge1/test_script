@@ -3,27 +3,28 @@ use crate::error::{ParseWarning, ParseWarningType};
 use crate::interpreter::InstructionResult;
 use crate::variable::Variable;
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 pub struct ParseEnvironment {
-    pub variables: Vec<HashMap<String, Variable>>,
+    pub variables: Vec<IndexMap<String, Variable>>,
     pub args: Args,
 }
 
 impl ParseEnvironment {
     pub fn new(args: Args) -> ParseEnvironment {
         ParseEnvironment {
-            variables: vec![HashMap::new()],
+            variables: vec![IndexMap::new()],
             args,
         }
     }
 
     pub fn add_scope(&mut self) {
-        self.variables.push(HashMap::new());
+        self.variables.push(IndexMap::new());
     }
 
     pub fn remove_scope(&mut self) {
         self.check_unused();
+        self.check_assigned();
         self.variables.pop();
     }
 
@@ -63,21 +64,36 @@ impl ParseEnvironment {
             }
         }
     }
+
+    fn check_assigned(&self) {
+        for variable in &self.variables[self.variables.len() - 1] {
+            if !variable.1.r#const
+                && !variable.1.assigned
+                && variable.1.name.chars().nth(0).unwrap() != '_'
+            {
+                ParseWarning::new(
+                    ParseWarningType::VariableNeverReAssigned,
+                    variable.1.declaration_token.clone(),
+                )
+                .print(self.args.disable_warnings);
+            }
+        }
+    }
 }
 
 pub struct Environment {
-    pub variables: Vec<HashMap<String, InstructionResult>>,
+    pub variables: Vec<IndexMap<String, InstructionResult>>,
 }
 
 impl Environment {
     pub fn new() -> Environment {
         Environment {
-            variables: vec![HashMap::new()],
+            variables: vec![IndexMap::new()],
         }
     }
 
     pub fn add_scope(&mut self) {
-        self.variables.push(HashMap::new());
+        self.variables.push(IndexMap::new());
     }
 
     pub fn remove_scope(&mut self) {
