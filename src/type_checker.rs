@@ -87,11 +87,14 @@ impl TypeChecker {
                 variable,
                 instruction,
                 token,
-            } => self.check_assignment(&variable, &instruction, token),
+                declaration,
+            } => self.check_assignment(&variable, &instruction, token, declaration),
 
-            InstructionType::IterableAssignment(variable, instruction) => {
-                self.check_iterable_assignment(&variable, &instruction)
-            }
+            InstructionType::IterableAssignment {
+                variable,
+                instruction,
+                token,
+            } => self.check_iterable_assignment(&variable, &instruction, token),
 
             InstructionType::UnaryOperation {
                 operator,
@@ -216,10 +219,11 @@ impl TypeChecker {
         variable: &Variable,
         instruction: &Instruction,
         token: &Token,
+        declaration: &bool,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
 
-        let instruction_type = self.check_instruction(&instruction.clone())?;
+        let instruction_type = self.check_instruction(&instruction)?;
 
         if variable_type != Type::Any && variable_type != instruction_type {
             return Err(ParseError::new(
@@ -238,6 +242,12 @@ impl TypeChecker {
         variable.read = false;
         variable.last_assignment_token = token.clone();
 
+        if !declaration {
+            variable.assigned = true;
+        } else {
+            variable.assigned = false;
+        }
+
         self.environment.insert(variable);
         Ok(Type::None)
     }
@@ -246,12 +256,19 @@ impl TypeChecker {
         &mut self,
         variable: &Variable,
         instruction: &Instruction,
+        token: &Token,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
         match self.check_instruction(&instruction) {
             Ok(Type::Regex) => match variable_type {
                 Type::String => {
                     self.environment.insert(variable.clone());
+                    match self.environment.get(&variable.name) {
+                        Some(v) => {
+                            v.assigned = true;
+                        }
+                        None => (),
+                    }
                     Ok(variable_type)
                 }
                 _ => Err(ParseError::new(
@@ -259,7 +276,7 @@ impl TypeChecker {
                         expected: vec![Type::Regex],
                         actual: variable_type,
                     },
-                    instruction.token.clone(),
+                    token.clone(),
                 )),
             },
             Ok(t) => Err(ParseError::new(
@@ -267,7 +284,7 @@ impl TypeChecker {
                     expected: vec![Type::Iterable],
                     actual: t,
                 },
-                instruction.token.clone(),
+                token.clone(),
             )),
             Err(e) => Err(e),
         }

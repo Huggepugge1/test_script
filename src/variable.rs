@@ -13,6 +13,7 @@ pub struct Variable {
     pub last_assignment_token: Token,
 
     pub read: bool,
+    pub assigned: bool,
 }
 
 impl std::fmt::Display for Variable {

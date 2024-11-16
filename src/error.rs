@@ -231,6 +231,7 @@ pub enum ParseWarningType<'a> {
     UnusedValue,
     UnusedVariable,
     VariableNotRead,
+    VariableNeverReAssigned,
 
     ConstantNotUpperCase(String),
     VariableNotSnakeCase(String),
@@ -239,7 +240,7 @@ pub enum ParseWarningType<'a> {
 
     NoBlock(&'a Token),
 
-    MagicLiteral,
+    MagicLiteral(Type),
 }
 
 pub struct ParseWarning<'a> {
@@ -257,6 +258,9 @@ impl<'a> std::fmt::Display for ParseWarningType<'a> {
             ParseWarningType::VariableNotRead => {
                 write!(f, "Variable is not read after assignment")
             }
+            ParseWarningType::VariableNeverReAssigned => {
+                write!(f, "Variable is never reassigned")
+            }
             ParseWarningType::ConstantNotUpperCase(_identifier) => {
                 write!(f, "Constants should be in UPPER_SNAKE_CASE")
             }
@@ -265,7 +269,7 @@ impl<'a> std::fmt::Display for ParseWarningType<'a> {
             }
             ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
             ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
-            ParseWarningType::MagicLiteral => write!(f, "Magic number detected"),
+            ParseWarningType::MagicLiteral(r#type) => write!(f, "Magic {type} detected"),
         }
     }
 }
@@ -338,6 +342,18 @@ impl<'a> ParseWarning<'a> {
                 self.token.column,
                 self.token.as_string(PrintStyle::Warning),
             ),
+            ParseWarningType::VariableNeverReAssigned => eprintln!(
+                "{}{}              \n\
+                 In: {}:{}:{}      \n\
+                 {} {}             \n",
+                "warning: ".bright_yellow(),
+                self.r#type,
+                self.token.file,
+                self.token.row,
+                self.token.column,
+                self.token.as_string(PrintStyle::Warning),
+                "consider changing to `const`".bright_yellow(),
+            ),
             ParseWarningType::ConstantNotUpperCase(identifier) => {
                 let new_name = identifier.to_upper_snake_case();
                 eprintln!(
@@ -395,7 +411,7 @@ impl<'a> ParseWarning<'a> {
                 }
                 _ => unreachable!(),
             },
-            ParseWarningType::MagicLiteral => eprintln!(
+            ParseWarningType::MagicLiteral(_type) => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",
@@ -417,6 +433,7 @@ pub enum InterpreterErrorType {
         from: Type,
         to: Type,
     },
+    TestFailed,
 }
 
 impl std::fmt::Display for InterpreterErrorType {
@@ -428,6 +445,7 @@ impl std::fmt::Display for InterpreterErrorType {
                     "Type cast error: Could not cast {from} \"{result}\" to `{to}`",
                 )
             }
+            InterpreterErrorType::TestFailed => write!(f, "Test failed"),
         }
     }
 }

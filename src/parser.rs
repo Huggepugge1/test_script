@@ -169,8 +169,11 @@ impl Parser {
                     && !white_listed_constants::STRINGS.contains(&value.as_str())
                 {
                     if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
-                            .print(self.args.disable_warnings)
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::String),
+                            token.clone(),
+                        )
+                        .print(self.args.disable_warnings)
                     }
                 }
 
@@ -321,8 +324,11 @@ impl Parser {
                     && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
                 {
                     if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
-                            .print(self.args.disable_warnings)
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::Regex),
+                            token.clone(),
+                        )
+                        .print(self.args.disable_warnings)
                     }
                 }
                 Ok(Instruction::new(
@@ -343,7 +349,7 @@ impl Parser {
                     && !white_listed_constants::INTEGERS.contains(&value)
                 {
                     if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
                             .print(self.args.disable_warnings)
                     }
                 }
@@ -365,8 +371,11 @@ impl Parser {
                     && !white_listed_constants::FLOATS.contains(&value)
                 {
                     if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
-                            .print(self.args.disable_warnings)
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::Float),
+                            token.clone(),
+                        )
+                        .print(self.args.disable_warnings)
                     }
                 }
                 Ok(Instruction::new(
@@ -387,7 +396,7 @@ impl Parser {
                     && !white_listed_constants::BOOLS.contains(&value)
                 {
                     if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
                             .print(self.args.disable_warnings)
                     }
                 }
@@ -480,6 +489,7 @@ impl Parser {
                     identifier_token: identifier.clone(),
                     last_assignment_token: token.clone(),
                     read: true,
+                    assigned: true,
                 };
 
                 self.environment.insert(variable.clone());
@@ -535,6 +545,7 @@ impl Parser {
             identifier_token: identifier.clone(),
             last_assignment_token: assignment.clone(),
             read: true,
+            assigned: true,
         };
 
         let instruction = match self.parse_expression(true, true) {
@@ -554,6 +565,7 @@ impl Parser {
                         variable,
                         instruction: Box::new(instruction),
                         token: identifier,
+                        declaration: true,
                     },
                     token,
                 ))
@@ -561,7 +573,11 @@ impl Parser {
             TokenType::IterableAssignmentOperator => {
                 self.environment.insert(variable.clone());
                 Ok(Instruction::new(
-                    InstructionType::IterableAssignment(variable, Box::new(instruction)),
+                    InstructionType::IterableAssignment {
+                        variable,
+                        instruction: Box::new(instruction),
+                        token: token.clone(),
+                    },
                     token,
                 ))
             }
@@ -625,6 +641,7 @@ impl Parser {
                 variable: variable.clone(),
                 instruction: Box::new(instruction),
                 token: token.clone(),
+                declaration: false,
             },
             token,
         ))

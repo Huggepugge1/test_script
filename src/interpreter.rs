@@ -4,7 +4,7 @@ use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, 
 use crate::r#type::Type;
 use crate::variable::Variable;
 
-use expectrl::{spawn, Session, WaitStatus};
+use expectrl::{spawn, Session, Signal, WaitStatus};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
@@ -56,7 +56,12 @@ impl Test {
         match self.interpret_instruction(instruction) {
             Ok(_) => (),
             Err(e) => {
-                e.print();
+                match e.r#type {
+                    InterpreterErrorType::TestFailed => (),
+                    _ => {
+                        e.print();
+                    }
+                }
                 return;
             }
         }
@@ -87,8 +92,12 @@ impl Test {
         println!("Test passed: {}", self.name);
     }
 
-    fn fail(&self, message: &str) {
+    fn fail(&mut self, message: &str) {
         eprintln!("{} failed: {}", self.name, message);
+        self.process
+            .get_process_mut()
+            .kill(Signal::SIGKILL)
+            .unwrap();
     }
 
     fn interpret_unary_operation(
@@ -484,9 +493,11 @@ impl Test {
     ) -> Result<InstructionResult, InterpreterError> {
         let mut result = InstructionResult::None;
         let (assignment_var, assignment_values) = match assignment.r#type {
-            InstructionType::IterableAssignment(var, instruction) => {
-                (var, self.interpret_instruction(*instruction)?)
-            }
+            InstructionType::IterableAssignment {
+                variable,
+                instruction,
+                ..
+            } => (variable, self.interpret_instruction(*instruction)?),
             _ => {
                 unreachable!()
             }
@@ -560,6 +571,12 @@ impl Test {
         &mut self,
         instruction: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
+        if self.passed == false {
+            return Err(InterpreterError::new(
+                InterpreterErrorType::TestFailed,
+                "Test failed",
+            ));
+        }
         Ok(match instruction.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
