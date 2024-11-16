@@ -121,6 +121,9 @@ impl<'a> Lexer<'a> {
 
         self.contents.next();
 
+        current = current.replace("\\n", "\n");
+        current = current.replace("\\t", "\t");
+        current = current.replace("\\r", "\r");
         let token = self.make_token(TokenType::StringLiteral { value: current });
         self.row = new_row;
         self.column = new_column;
@@ -221,6 +224,9 @@ impl<'a> Lexer<'a> {
                     self.row += 1;
                     continue;
                 }
+                '%' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                    value: "%".to_string(),
+                })),
                 ':' => self.tokens.push(self.make_token(TokenType::Colon)),
                 '<' => {
                     self.contents.next();

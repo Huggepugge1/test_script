@@ -4,8 +4,7 @@ use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, 
 use crate::r#type::Type;
 use crate::variable::Variable;
 
-use std::io::{BufRead, BufReader, Error, ErrorKind, Write};
-use std::process::{Child, Command, Stdio};
+use expectrl::{spawn, Session, WaitStatus};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
@@ -32,58 +31,24 @@ impl std::fmt::Display for InstructionResult {
 
 struct Test {
     name: String,
-    command: String,
     instruction: Instruction,
     environment: Environment,
-    input: Vec<String>,
-    output: Vec<String>,
+    process: Session,
+    passed: bool,
 }
 
 impl Test {
     fn new(name: String, command: String, instruction: Instruction) -> Self {
+        let process = spawn(command).unwrap();
+
         Self {
             name,
-            command,
 
             instruction,
             environment: Environment::new(),
-            input: Vec::new(),
-            output: Vec::new(),
+            process,
+            passed: true,
         }
-    }
-
-    fn run_test(&mut self) -> Result<(), ()> {
-        let mut process = Process::spawn(self.command.clone()).expect("Failed to run test");
-        let mut buffer = String::new();
-        for line in self.input.clone() {
-            buffer.push_str(&line);
-            buffer.push('\n');
-        }
-        process.send(&buffer).expect("Failed to send input");
-
-        let lines = process.get_lines().expect("Failed to get output");
-
-        if lines.len() != self.output.len() {
-            self.fail(&format!(
-                "Expected output length: {}, got: {}",
-                self.output.len(),
-                lines.len()
-            ));
-            return Err(());
-        }
-
-        for (i, line) in lines.iter().enumerate() {
-            if self.output[i] != *line {
-                self.fail(&format!(
-                    "Expected output: {:?}, got: {:?}",
-                    self.output[i], line
-                ));
-                return Err(());
-            }
-        }
-
-        process.kill().expect("Failed to kill process");
-        Ok(())
     }
 
     fn run(&mut self) {
@@ -96,9 +61,25 @@ impl Test {
             }
         }
 
-        match self.run_test() {
-            Ok(_) => self.pass(),
-            Err(_) => (),
+        match self.process.get_process().status() {
+            Ok(WaitStatus::Exited(_, value)) => {
+                if value != 0 {
+                    self.passed = false;
+                    self.fail(&format!("Non zero exit code {}", value));
+                }
+            }
+            Ok(_) => {
+                self.passed = false;
+                self.fail("Process did not exit");
+            }
+            Err(e) => {
+                eprintln!("Failed to kill process: {}", e);
+            }
+        }
+
+        match self.passed {
+            false => (),
+            true => self.pass(),
         }
     }
 
@@ -159,6 +140,7 @@ impl Test {
             BinaryOperator::Subtraction => self.interpret_subtraction(left, right),
             BinaryOperator::Multiplication => self.interpret_multiplication(left, right),
             BinaryOperator::Division => self.interpret_division(left, right),
+            BinaryOperator::Modulo => self.interpret_modulo(left, right),
 
             BinaryOperator::Equal => self.interpret_equal(left, right),
             BinaryOperator::NotEqual => self.interpret_not_equal(left, right),
@@ -251,6 +233,23 @@ impl Test {
             }
             (InstructionResult::Float(left), InstructionResult::Float(right)) => {
                 Ok(InstructionResult::Float(left / right))
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
+
+    fn interpret_modulo(
+        &mut self,
+        left: Instruction,
+        right: Instruction,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let left = self.interpret_instruction(left)?;
+        let right = self.interpret_instruction(right)?;
+        match (left.clone(), right.clone()) {
+            (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Integer(left % right))
             }
             _ => {
                 unreachable!()
@@ -409,8 +408,30 @@ impl Test {
             }
         };
         match builtin {
-            BuiltIn::Input(_) => self.input.push(value.clone()),
-            BuiltIn::Output(_) => self.output.push(value.clone()),
+            BuiltIn::Input(_) => {
+                self.process
+                    .send_line(&value)
+                    .expect("Failed to send input to process");
+            }
+            BuiltIn::Output(_) => match self.process.expect(expectrl::Regex(".")) {
+                Ok(v) => {
+                    let output = String::from_utf8(v.as_bytes().to_vec())
+                        .unwrap()
+                        .replace("\r", "");
+                    if output.trim() != value {
+                        self.passed = false;
+                        self.fail(&format!(
+                            "Output mismatch: expected \"{:?}\", got \"{:?}\"",
+                            value,
+                            output.trim(),
+                        ));
+                    }
+                }
+                Err(_) => {
+                    self.passed = false;
+                    self.fail("Got no output");
+                }
+            },
             BuiltIn::Print(_) => print!("{}", value),
             BuiltIn::Println(_) => println!("{}", value),
         }
@@ -586,56 +607,6 @@ impl Test {
                 unreachable!();
             }
         })
-    }
-}
-
-struct Process {
-    child: Child,
-}
-
-impl Process {
-    fn spawn(command: String) -> Result<Self, Error> {
-        let child = Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()?;
-        Ok(Process { child })
-    }
-
-    fn send(&mut self, input: &str) -> Result<(), Error> {
-        if let Some(stdin) = self.child.stdin.as_mut() {
-            stdin.write_all(input.as_bytes())?;
-        }
-        Ok(())
-    }
-
-    fn get_lines(&mut self) -> Result<Vec<String>, Error> {
-        let stdout = self.child.stdout.as_mut().ok_or_else(|| {
-            Error::new(
-                ErrorKind::BrokenPipe,
-                "Failed to capture child process stdout",
-            )
-        })?;
-
-        let mut reader = BufReader::new(stdout);
-        let mut output = Vec::new();
-
-        loop {
-            let mut line = String::new();
-            let bytes = reader.read_line(&mut line)?;
-            if bytes == 0 {
-                break;
-            }
-            output.push(line.trim().to_string());
-        }
-
-        Ok(output)
-    }
-
-    fn kill(&mut self) -> Result<(), Error> {
-        self.child.kill()
     }
 }
 
