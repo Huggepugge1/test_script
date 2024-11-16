@@ -421,7 +421,7 @@ impl Test {
                     if output.trim() != value {
                         self.passed = false;
                         self.fail(&format!(
-                            "Output mismatch: expected \"{:?}\", got \"{:?}\"",
+                            "Output mismatch: expected {:?}, got {:?}",
                             value,
                             output.trim(),
                         ));

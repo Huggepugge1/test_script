@@ -73,12 +73,13 @@ impl TypeChecker {
             }
 
             InstructionType::Variable(variable) => {
-                let mut variable = match self.environment.get(&variable.name) {
-                    Some(v) => v.clone(),
-                    None => variable.clone(),
+                let variable = match self.environment.get(&variable.name) {
+                    Some(v) => {
+                        v.read = true;
+                        v
+                    }
+                    None => variable,
                 };
-                variable.read = true;
-                self.environment.insert(variable.clone());
                 Ok(variable.r#type)
             }
 

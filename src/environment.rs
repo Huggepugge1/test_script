@@ -34,10 +34,10 @@ impl ParseEnvironment {
             .insert(variable.name.clone(), variable);
     }
 
-    pub fn get(&self, name: &str) -> Option<&Variable> {
-        for scope in self.variables.iter().rev() {
-            if let Some(variable) = scope.get(name) {
-                return Some(variable);
+    pub fn get(&mut self, name: &str) -> Option<&mut Variable> {
+        for scope in &mut self.variables.iter_mut().rev() {
+            if let Some(r#type) = scope.get_mut(name) {
+                return Some(r#type);
             }
         }
 
