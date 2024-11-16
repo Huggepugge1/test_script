@@ -49,6 +49,7 @@ impl TypeChecker {
             InstructionType::StringLiteral(_) => Ok(Type::String),
             InstructionType::RegexLiteral(_) => Ok(Type::Regex),
             InstructionType::IntegerLiteral(_) => Ok(Type::Int),
+            InstructionType::FloatLiteral(_) => Ok(Type::Float),
             InstructionType::BooleanLiteral(_) => Ok(Type::Bool),
 
             InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
@@ -336,6 +337,7 @@ impl TypeChecker {
         match (left_type, right_type) {
             (Type::String, Type::String) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::String, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::String],
@@ -370,6 +372,7 @@ impl TypeChecker {
 
         match (left_type, right_type) {
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::Int, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
@@ -398,6 +401,7 @@ impl TypeChecker {
         match (left_type, right_type) {
             (Type::String, Type::Int) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::String, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
@@ -439,6 +443,14 @@ impl TypeChecker {
                 },
                 right.token.clone(),
             )),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::Float, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Float],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
 
             (t1, _t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
@@ -468,6 +480,14 @@ impl TypeChecker {
                 },
                 right.token.clone(),
             )),
+            (Type::Float, Type::Float) => Ok(Type::Bool),
+            (Type::Float, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Float],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
             (Type::String, Type::String) | (Type::Bool, Type::Bool) => match operator {
                 BinaryOperator::Equal | BinaryOperator::NotEqual => Ok(Type::Bool),
                 _ => Err(ParseError::new(
@@ -481,7 +501,7 @@ impl TypeChecker {
 
             (t1, _t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: vec![t1],
+                    expected: vec![Type::Int, Type::Float],
                     actual: t1,
                 },
                 left.token.clone(),

@@ -12,6 +12,7 @@ pub enum TokenType {
     StringLiteral { value: String },
     RegexLiteral { value: String },
     IntegerLiteral { value: i64 },
+    FloatLiteral { value: f64 },
     BooleanLiteral { value: bool },
 
     Keyword { value: String },
@@ -46,6 +47,7 @@ impl std::fmt::Display for TokenType {
             TokenType::StringLiteral { value } => write!(f, "{value}"),
             TokenType::RegexLiteral { value } => write!(f, "{value}"),
             TokenType::IntegerLiteral { value } => write!(f, "`{value}`"),
+            TokenType::FloatLiteral { value } => write!(f, "`{value}`"),
             TokenType::BooleanLiteral { value } => write!(f, "`{value}`"),
 
             TokenType::Keyword { value } => write!(f, "keyword `{value}`"),
@@ -113,6 +115,7 @@ impl Token {
             TokenType::StringLiteral { value } => value.len(),
             TokenType::RegexLiteral { value } => value.len(),
             TokenType::IntegerLiteral { value } => value.to_string().len(),
+            TokenType::FloatLiteral { value } => value.to_string().len(),
             TokenType::BooleanLiteral { value } => value.to_string().len(),
 
             TokenType::Keyword { value } => value.len(),

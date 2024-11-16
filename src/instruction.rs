@@ -113,6 +113,7 @@ impl std::fmt::Display for Instruction {
                 InstructionType::StringLiteral(ref value) => value.clone(),
                 InstructionType::RegexLiteral(ref value) => format!("{:?}", value),
                 InstructionType::IntegerLiteral(ref value) => value.to_string(),
+                InstructionType::FloatLiteral(ref value) => value.to_string(),
                 InstructionType::BooleanLiteral(ref value) => value.to_string(),
 
                 InstructionType::BuiltIn(ref built_in) => match built_in {
@@ -215,6 +216,7 @@ pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
     IntegerLiteral(i64),
+    FloatLiteral(f64),
     BooleanLiteral(bool),
 
     BuiltIn(BuiltIn),

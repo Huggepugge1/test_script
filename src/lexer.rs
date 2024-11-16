@@ -63,7 +63,7 @@ impl<'a> Lexer<'a> {
             "for" | "let" | "const" | "if" | "else" => TokenType::Keyword {
                 value: value.to_string(),
             },
-            "string" | "regex" | "int" | "bool" => TokenType::Type {
+            "string" | "regex" | "int" | "float" | "bool" => TokenType::Type {
                 value: Type::from(value),
             },
             "true" | "false" => TokenType::BooleanLiteral {
@@ -155,11 +155,17 @@ impl<'a> Lexer<'a> {
         token
     }
 
-    pub fn tokenize_integer_literal(&mut self) -> Token {
+    pub fn tokenize_number_literal(&mut self) -> Token {
         let mut length = 0;
         let mut current = String::new();
+        let mut float = false;
         while let Some(next) = self.contents.peek() {
-            if !next.is_ascii_digit() {
+            if *next == '.' {
+                if float {
+                    panic!("Unexpected character: \".\"");
+                }
+                float = true;
+            } else if !next.is_ascii_digit() {
                 break;
             }
             current.push(*next);
@@ -167,9 +173,14 @@ impl<'a> Lexer<'a> {
             length += 1;
         }
 
-        let token = self.make_token(TokenType::IntegerLiteral {
-            value: current.parse::<i64>().unwrap(),
-        });
+        let token = match float {
+            false => self.make_token(TokenType::IntegerLiteral {
+                value: current.parse::<i64>().unwrap(),
+            }),
+            true => self.make_token(TokenType::FloatLiteral {
+                value: current.parse::<f64>().unwrap(),
+            }),
+        };
         self.column += length;
         token
     }
@@ -323,7 +334,7 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 '0'..='9' => {
-                    let token = self.tokenize_integer_literal();
+                    let token = self.tokenize_number_literal();
                     self.tokens.push(token);
                     continue;
                 }

@@ -12,6 +12,7 @@ pub enum InstructionResult {
     String(String),
     Regex(Vec<String>),
     Integer(i64),
+    Float(f64),
     Bool(bool),
     None,
 }
@@ -22,6 +23,7 @@ impl std::fmt::Display for InstructionResult {
             InstructionResult::String(s) => write!(f, "{}", s),
             InstructionResult::Regex(s) => write!(f, "{:?}", s),
             InstructionResult::Integer(i) => write!(f, "{}", i),
+            InstructionResult::Float(i) => write!(f, "{}", i),
             InstructionResult::Bool(b) => write!(f, "{}", b),
             InstructionResult::None => write!(f, "()"),
         }
@@ -139,6 +141,7 @@ impl Test {
         let value = self.interpret_instruction(instruction)?;
         match value {
             InstructionResult::Integer(value) => Ok(InstructionResult::Integer(-value)),
+            InstructionResult::Float(value) => Ok(InstructionResult::Float(-value)),
             _ => {
                 unreachable!()
             }
@@ -183,6 +186,9 @@ impl Test {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Integer(left + right))
             }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Float(left + right))
+            }
             _ => {
                 unreachable!()
             }
@@ -199,6 +205,9 @@ impl Test {
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Integer(left - right))
+            }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Float(left - right))
             }
             _ => {
                 unreachable!()
@@ -220,6 +229,9 @@ impl Test {
             (InstructionResult::String(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::String(left.repeat(right as usize)))
             }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Float(left * right))
+            }
             _ => {
                 unreachable!()
             }
@@ -236,6 +248,9 @@ impl Test {
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Integer(left / right))
+            }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Float(left / right))
             }
             _ => {
                 unreachable!()
@@ -274,6 +289,9 @@ impl Test {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Bool(left > right))
             }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Bool(left > right))
+            }
             _ => {
                 unreachable!()
             }
@@ -289,6 +307,9 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Bool(left >= right))
+            }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
                 Ok(InstructionResult::Bool(left >= right))
             }
             _ => {
@@ -308,6 +329,9 @@ impl Test {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
                 Ok(InstructionResult::Bool(left < right))
             }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
+                Ok(InstructionResult::Bool(left < right))
+            }
             _ => {
                 unreachable!()
             }
@@ -323,6 +347,9 @@ impl Test {
         let right = self.interpret_instruction(right)?;
         match (left.clone(), right.clone()) {
             (InstructionResult::Integer(left), InstructionResult::Integer(right)) => {
+                Ok(InstructionResult::Bool(left <= right))
+            }
+            (InstructionResult::Float(left), InstructionResult::Float(right)) => {
                 Ok(InstructionResult::Bool(left <= right))
             }
             _ => {
@@ -516,6 +543,7 @@ impl Test {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
             InstructionType::RegexLiteral(value) => InstructionResult::Regex(value),
             InstructionType::IntegerLiteral(value) => InstructionResult::Integer(value),
+            InstructionType::FloatLiteral(value) => InstructionResult::Float(value),
             InstructionType::BooleanLiteral(value) => InstructionResult::Bool(value),
 
             InstructionType::BuiltIn(builtin) => self.interpret_builtin(builtin)?,
