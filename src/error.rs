@@ -1,10 +1,9 @@
 use crate::interpreter::InstructionResult;
 use crate::r#type::Type;
 use crate::token::{PrintStyle, Token, TokenType};
-use crate::variable::Variable;
+use crate::variable::{SnakeCase, Variable};
 
 use colored::Colorize;
-use convert_case::{Case, Casing};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorType {
@@ -340,7 +339,7 @@ impl<'a> ParseWarning<'a> {
                 self.token.as_string(PrintStyle::Warning),
             ),
             ParseWarningType::ConstantNotUpperCase(identifier) => {
-                let new_name = identifier.to_case(Case::UpperSnake);
+                let new_name = identifier.to_upper_snake_case();
                 eprintln!(
                     "{}{}              \n\
                      In: {}:{}:{}      \n\
@@ -355,7 +354,7 @@ impl<'a> ParseWarning<'a> {
                 )
             }
             ParseWarningType::VariableNotSnakeCase(identifier) => {
-                let new_name = identifier.to_case(Case::Snake);
+                let new_name = identifier.to_snake_case();
                 eprintln!(
                     "{}{}              \n\
                      In: {}:{}:{}      \n\

@@ -5,10 +5,8 @@ use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, 
 use crate::r#type::Type;
 use crate::regex;
 use crate::token::{Token, TokenCollection, TokenType};
-use crate::variable::Variable;
-use crate::white_listed_constants::WHITE_LISTED_CONSTANTS;
-
-use convert_case::{Case, Casing};
+use crate::variable::{SnakeCase, Variable};
+use crate::white_listed_constants;
 
 pub struct Parser {
     tokens: TokenCollection,
@@ -84,6 +82,7 @@ impl Parser {
             TokenType::StringLiteral { .. } => self.parse_string_literal()?,
             TokenType::RegexLiteral { .. } => self.parse_regex_literal()?,
             TokenType::IntegerLiteral { .. } => self.parse_integer_literal()?,
+            TokenType::FloatLiteral { .. } => self.parse_float_literal()?,
             TokenType::BooleanLiteral { .. } => self.parse_boolean_literal()?,
 
             TokenType::Keyword { .. } => self.parse_keyword()?,
@@ -166,7 +165,7 @@ impl Parser {
             TokenType::StringLiteral { value } => {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
-                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                    && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
                 {
                     if !self.args.disable_style_warnings {
                         ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
@@ -319,7 +318,7 @@ impl Parser {
             TokenType::RegexLiteral { value } => {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
-                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                    && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
                 {
                     if !self.args.disable_style_warnings {
                         ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
@@ -341,7 +340,7 @@ impl Parser {
             TokenType::IntegerLiteral { value } => {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
-                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                    && !white_listed_constants::INTEGERS.contains(&value)
                 {
                     if !self.args.disable_style_warnings {
                         ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
@@ -357,13 +356,35 @@ impl Parser {
         }
     }
 
+    fn parse_float_literal(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        match token.r#type {
+            TokenType::FloatLiteral { value } => {
+                if !self.args.disable_magic_warnings
+                    && !self.in_constant_declaration
+                    && !white_listed_constants::FLOATS.contains(&value)
+                {
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
+                            .print(self.args.disable_warnings)
+                    }
+                }
+                Ok(Instruction::new(
+                    InstructionType::FloatLiteral(value),
+                    token,
+                ))
+            }
+            _ => unreachable!(),
+        }
+    }
+
     fn parse_boolean_literal(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         match token.r#type {
             TokenType::BooleanLiteral { value } => {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
-                    && !WHITE_LISTED_CONSTANTS.contains(&value.to_string().as_str())
+                    && !white_listed_constants::BOOLS.contains(&value)
                 {
                     if !self.args.disable_style_warnings {
                         ParseWarning::new(ParseWarningType::MagicLiteral, token.clone())
@@ -410,18 +431,8 @@ impl Parser {
         let identifier_name = match &identifier.r#type {
             TokenType::Identifier { value } => {
                 match r#const {
-                    true => {
-                        self.in_constant_declaration = true;
-                        if !self.args.disable_style_warnings && !value.is_case(Case::UpperSnake) {
-                            ParseWarning::new(
-                                ParseWarningType::ConstantNotUpperCase(value.to_string()),
-                                identifier.clone(),
-                            )
-                            .print(self.args.disable_warnings)
-                        }
-                    }
                     false => {
-                        if !self.args.disable_style_warnings && !value.is_case(Case::Snake) {
+                        if !self.args.disable_style_warnings && !value.is_snake_case() {
                             ParseWarning::new(
                                 ParseWarningType::VariableNotSnakeCase(value.to_string()),
                                 identifier.clone(),
@@ -429,8 +440,18 @@ impl Parser {
                             .print(self.args.disable_warnings)
                         }
                     }
+                    true => {
+                        self.in_constant_declaration = true;
+                        if !self.args.disable_style_warnings && !value.is_upper_snake_case() {
+                            ParseWarning::new(
+                                ParseWarningType::ConstantNotUpperCase(value.to_string()),
+                                identifier.clone(),
+                            )
+                            .print(self.args.disable_warnings)
+                        }
+                    }
                 }
-                if r#const && !value.is_case(Case::UpperSnake) {}
+                if r#const && !value.is_snake_case() {}
                 value.clone()
             }
             _ => {
