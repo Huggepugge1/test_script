@@ -443,7 +443,7 @@ impl InterpreterError {
                 eprintln!("Type cast error: Failed to cast `{from} {result}` to `{to}`\n");
             }
             InterpreterError::TestFailed(message) => {
-                eprintln!("Test failed: {message}\n");
+                eprintln!("Test failed: {message}");
             }
         }
     }

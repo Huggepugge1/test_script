@@ -56,12 +56,7 @@ impl Test {
         match self.interpret_instruction(instruction) {
             Ok(_) => (),
             Err(e) => {
-                match e {
-                    InterpreterError::TestFailed(_) => (),
-                    _ => {
-                        e.print();
-                    }
-                }
+                e.print();
                 return;
             }
         }
@@ -410,14 +405,14 @@ impl Test {
                 Ok(_) => (),
                 Err(e) => {
                     self.passed = false;
-                    self.fail(e);
+                    return Err(e);
                 }
             },
             BuiltIn::Output(_) => match self.process.read_line(value) {
                 Ok(()) => (),
                 Err(e) => {
                     self.passed = false;
-                    self.fail(e);
+                    return Err(e);
                 }
             },
             BuiltIn::Print(_) => print!("{}", value),

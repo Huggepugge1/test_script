@@ -100,21 +100,23 @@ impl Process {
             println!("Reading line");
         }
 
-        let mut output = String::new();
-        self.reader
-            .read_line(&mut output)
-            .map_err(|_| InterpreterError::TestFailed("Failed to read line".to_string()))?;
+        for line in expected.lines() {
+            let mut output = String::new();
+            self.reader
+                .read_line(&mut output)
+                .map_err(|_| InterpreterError::TestFailed("Failed to read line".to_string()))?;
 
-        if self.debug {
-            println!("Read: {}", output);
-        }
+            if self.debug {
+                println!("Read: {}", output);
+            }
 
-        if output.trim_end() != expected {
-            return Err(InterpreterError::TestFailed(format!(
-                "Expected: `{}`, got: `{}`",
-                expected,
-                output.trim_end()
-            )));
+            if output.trim_end() != line {
+                return Err(InterpreterError::TestFailed(format!(
+                    "Expected: `{}`, got: `{}`",
+                    line,
+                    output.trim_end()
+                )));
+            }
         }
         Ok(())
     }
