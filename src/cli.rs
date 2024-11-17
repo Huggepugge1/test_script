@@ -20,6 +20,9 @@ pub struct Args {
 
     #[clap(short, long, default_value = "3")]
     pub max_size: u32,
+
+    #[clap(short, long)]
+    pub debug: bool,
 }
 
 pub fn run() {

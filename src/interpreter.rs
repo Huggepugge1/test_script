@@ -1,10 +1,10 @@
+use crate::cli::Args;
 use crate::environment::Environment;
-use crate::error::{InterpreterError, InterpreterErrorType};
+use crate::error::InterpreterError;
 use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
+use crate::process::Process;
 use crate::r#type::Type;
 use crate::variable::Variable;
-
-use expectrl::{spawn, Session, Signal, WaitStatus};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
@@ -33,13 +33,13 @@ struct Test {
     name: String,
     instruction: Instruction,
     environment: Environment,
-    process: Session,
+    process: Process,
     passed: bool,
 }
 
 impl Test {
-    fn new(name: String, command: String, instruction: Instruction) -> Self {
-        let process = spawn(command).unwrap();
+    fn new(name: String, command: String, instruction: Instruction, args: Args) -> Self {
+        let process = Process::new(&command, args.debug);
 
         Self {
             name,
@@ -56,8 +56,8 @@ impl Test {
         match self.interpret_instruction(instruction) {
             Ok(_) => (),
             Err(e) => {
-                match e.r#type {
-                    InterpreterErrorType::TestFailed => (),
+                match e {
+                    InterpreterError::TestFailed(_) => (),
                     _ => {
                         e.print();
                     }
@@ -66,19 +66,11 @@ impl Test {
             }
         }
 
-        match self.process.get_process().status() {
-            Ok(WaitStatus::Exited(_, value)) => {
-                if value != 0 {
-                    self.passed = false;
-                    self.fail(&format!("Non zero exit code {}", value));
-                }
-            }
-            Ok(_) => {
-                self.passed = false;
-                self.fail("Process did not exit");
-            }
+        match self.process.terminate() {
+            Ok(()) => (),
             Err(e) => {
-                eprintln!("Failed to kill process: {}", e);
+                self.fail(e);
+                return;
             }
         }
 
@@ -92,12 +84,9 @@ impl Test {
         println!("Test passed: {}", self.name);
     }
 
-    fn fail(&mut self, message: &str) {
-        eprintln!("{} failed: {}", self.name, message);
-        self.process
-            .get_process_mut()
-            .kill(Signal::SIGKILL)
-            .unwrap();
+    fn fail(&mut self, error: InterpreterError) {
+        error.print();
+        let _ = self.process.terminate();
     }
 
     fn interpret_unary_operation(
@@ -417,28 +406,18 @@ impl Test {
             }
         };
         match builtin {
-            BuiltIn::Input(_) => {
-                self.process
-                    .send_line(&value)
-                    .expect("Failed to send input to process");
-            }
-            BuiltIn::Output(_) => match self.process.expect(expectrl::Regex(".")) {
-                Ok(v) => {
-                    let output = String::from_utf8(v.as_bytes().to_vec())
-                        .unwrap()
-                        .replace("\r", "");
-                    if output.trim() != value {
-                        self.passed = false;
-                        self.fail(&format!(
-                            "Output mismatch: expected {:?}, got {:?}",
-                            value,
-                            output.trim(),
-                        ));
-                    }
-                }
-                Err(_) => {
+            BuiltIn::Input(_) => match self.process.send(&value) {
+                Ok(_) => (),
+                Err(e) => {
                     self.passed = false;
-                    self.fail("Got no output");
+                    self.fail(e);
+                }
+            },
+            BuiltIn::Output(_) => match self.process.read_line(value) {
+                Ok(()) => (),
+                Err(e) => {
+                    self.passed = false;
+                    self.fail(e);
                 }
             },
             BuiltIn::Print(_) => print!("{}", value),
@@ -537,14 +516,11 @@ impl Test {
                 Ok(InstructionResult::Integer(match value.parse() {
                     Ok(value) => value,
                     Err(_) => {
-                        return Err(InterpreterError::new(
-                            InterpreterErrorType::TypeCastError {
-                                result: InstructionResult::String(value),
-                                from: Type::String,
-                                to: Type::Int,
-                            },
-                            "Failed to cast string to int",
-                        ));
+                        return Err(InterpreterError::TypeCastError {
+                            result: InstructionResult::String(value),
+                            from: Type::String,
+                            to: Type::Int,
+                        });
                     }
                 }))
             }
@@ -572,10 +548,7 @@ impl Test {
         instruction: Instruction,
     ) -> Result<InstructionResult, InterpreterError> {
         if self.passed == false {
-            return Err(InterpreterError::new(
-                InterpreterErrorType::TestFailed,
-                "Test failed",
-            ));
+            return Err(InterpreterError::TestFailed(String::new()));
         }
         Ok(match instruction.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value),
@@ -628,18 +601,19 @@ impl Test {
 }
 
 pub struct Interpreter {
+    args: Args,
     program: Vec<Instruction>,
 }
 
 impl Interpreter {
-    pub fn new(program: Vec<Instruction>) -> Self {
-        Self { program }
+    pub fn new(program: Vec<Instruction>, args: Args) -> Self {
+        Self { program, args }
     }
 
     fn interpret_test(&self, instruction: Instruction) {
         match instruction.r#type {
             InstructionType::Test(instruction, name, file) => {
-                let mut test = Test::new(name, file, *instruction);
+                let mut test = Test::new(name, file, *instruction, self.args.clone());
                 test.run();
             }
             _ => panic!("Unexpected instruction {:?}", instruction),
