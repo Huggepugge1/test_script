@@ -427,47 +427,24 @@ impl<'a> ParseWarning<'a> {
     }
 }
 
-pub enum InterpreterErrorType {
+pub enum InterpreterError {
     TypeCastError {
         result: InstructionResult,
         from: Type,
         to: Type,
     },
-    TestFailed,
-}
-
-impl std::fmt::Display for InterpreterErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            InterpreterErrorType::TypeCastError { result, from, to } => {
-                write!(
-                    f,
-                    "Type cast error: Could not cast {from} \"{result}\" to `{to}`",
-                )
-            }
-            InterpreterErrorType::TestFailed => write!(f, "Test failed"),
-        }
-    }
-}
-
-pub struct InterpreterError {
-    pub r#type: InterpreterErrorType,
-    hint: String,
+    TestFailed(String),
 }
 
 impl InterpreterError {
-    pub fn new(r#type: InterpreterErrorType, hint: impl Into<String>) -> InterpreterError {
-        InterpreterError {
-            r#type,
-            hint: hint.into(),
-        }
-    }
-
     pub fn print(&self) {
-        eprintln!(
-            "Error while executing: {}\n\
-                   Hint: {}\n",
-            self.r#type, self.hint
-        );
+        match &self {
+            InterpreterError::TypeCastError { result, from, to } => {
+                eprintln!("Type cast error: Failed to cast `{from} {result}` to `{to}`\n");
+            }
+            InterpreterError::TestFailed(message) => {
+                eprintln!("Test failed: {message}\n");
+            }
+        }
     }
 }

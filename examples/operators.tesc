@@ -34,6 +34,6 @@ division("calculator") {
     
     const one_divided_two: string = one as string + "/" + two as string;
     
-    input(one_times_two);
+    input(one_divided_two);
     output((one / two) as string);
 }

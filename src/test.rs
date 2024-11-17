@@ -12,7 +12,7 @@ pub fn run(args: cli::Args) {
 
     match program {
         Ok(program) => match type_check {
-            Ok(_) => interpreter::Interpreter::new(program).interpret(),
+            Ok(_) => interpreter::Interpreter::new(program, args).interpret(),
             Err(_) => (),
         },
         Err(_) => (),

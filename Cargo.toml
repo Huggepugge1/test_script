@@ -1,6 +1,8 @@
 [package]
 name = "test-script"
-version = "0.2.0"
+license = "MIT"
+description = "Testing programming language for IO"
+version = "0.2.1"
 edition = "2021"
 
 [dependencies]

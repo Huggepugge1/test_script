@@ -1,10 +1,12 @@
 mod cli;
 mod environment;
 mod error;
+mod exitcode;
 mod instruction;
 mod interpreter;
 mod lexer;
 mod parser;
+mod process;
 mod regex;
 mod test;
 mod token;
