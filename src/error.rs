@@ -1,4 +1,4 @@
-use crate::interpreter::InstructionResult;
+use crate::instruction::InstructionResult;
 use crate::r#type::Type;
 use crate::token::{PrintStyle, Token, TokenType};
 use crate::variable::{SnakeCase, Variable};
@@ -66,6 +66,8 @@ pub enum ParseErrorType {
         expected: TokenType,
         actual: TokenType,
     },
+
+    GlobalScope(TokenType),
 
     TypeCast {
         from: Type,
@@ -141,6 +143,10 @@ impl std::fmt::Display for ParseErrorType {
                     _ => format!("{expected}"),
                 };
                 write!(f, "Expected {expected}, found {actual}")
+            }
+
+            ParseErrorType::GlobalScope(token) => {
+                write!(f, "Unexpected token in global scope: {token}")
             }
 
             ParseErrorType::TypeCast { from, to } => {
@@ -474,7 +480,7 @@ impl<'a> ParseWarning<'a> {
 }
 
 pub enum InterpreterError {
-    TypeCastError {
+    TypeCast {
         result: InstructionResult,
         from: Type,
         to: Type,
@@ -485,7 +491,7 @@ pub enum InterpreterError {
 impl InterpreterError {
     pub fn print(&self) {
         match &self {
-            InterpreterError::TypeCastError { result, from, to } => {
+            InterpreterError::TypeCast { result, from, to } => {
                 eprintln!("Type cast error: Failed to cast `{from} {result}` to `{to}`\n");
             }
             InterpreterError::TestFailed(message) => {

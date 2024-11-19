@@ -56,7 +56,13 @@ impl std::fmt::Display for TokenType {
             TokenType::Type { value } => write!(f, "{value}"),
             TokenType::Colon => write!(f, ":"),
 
-            TokenType::Identifier { value } => write!(f, "identifier `{value}`"),
+            TokenType::Identifier { value } => {
+                if value.len() > 0 {
+                    write!(f, "identifier `{value}`")
+                } else {
+                    write!(f, "identifier")
+                }
+            }
 
             TokenType::OpenBlock => write!(f, "{{"),
             TokenType::CloseBlock => write!(f, "}}"),

@@ -1,6 +1,6 @@
 use crate::cli::Args;
 use crate::error::{ParseWarning, ParseWarningType};
-use crate::interpreter::InstructionResult;
+use crate::instruction::InstructionResult;
 use crate::variable::Variable;
 
 use indexmap::IndexMap;

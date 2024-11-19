@@ -33,16 +33,21 @@ impl Parser {
         while let Some(token) = self.tokens.peek() {
             let instruction = match token.clone().r#type {
                 TokenType::Identifier { .. } => self.parse_test(),
+                TokenType::Keyword { value } => match value.as_str() {
+                    "const" => self.parse_statement(),
+                    _ => {
+                        self.tokens.advance_to_next_instruction();
+                        Err(ParseError::new(
+                            ParseErrorType::GlobalScope(token.clone().r#type),
+                            token,
+                        ))
+                    }
+                },
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
-                        ParseErrorType::MismatchedTokenType {
-                            expected: TokenType::Identifier {
-                                value: "test".to_string(),
-                            },
-                            actual: r#type,
-                        },
-                        token,
+                        ParseErrorType::GlobalScope(r#type),
+                        token.clone(),
                     ))
                 }
             };
@@ -837,7 +842,10 @@ impl Parser {
 
         self.tokens.back();
         Ok(Instruction::new(
-            InstructionType::For(Box::new(assignment), Box::new(statement)),
+            InstructionType::For {
+                assignment: Box::new(assignment),
+                instruction: Box::new(statement),
+            },
             token,
         ))
     }
