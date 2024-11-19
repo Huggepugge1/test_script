@@ -35,6 +35,18 @@ impl TypeChecker {
                         }
                     }
                 }
+                InstructionType::Assignment {
+                    variable: _variable,
+                    instruction,
+                    token: _token,
+                    declaration: _declaration,
+                } => match self.check_instruction(&instruction) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        e.print();
+                        self.success = false;
+                    }
+                },
                 _ => unreachable!(),
             }
         }
@@ -64,10 +76,13 @@ impl TypeChecker {
                 r#else,
             } => self.check_conditional(condition, instruction, r#else),
 
-            InstructionType::For(assignment, statement) => {
+            InstructionType::For {
+                assignment,
+                instruction,
+            } => {
                 self.environment.add_scope();
                 self.check_instruction(&assignment)?;
-                let result = self.check_instruction(&statement)?;
+                let result = self.check_instruction(&instruction)?;
                 self.environment.remove_scope();
                 Ok(result)
             }
