@@ -3,6 +3,7 @@ use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
 use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
 use crate::r#type::Type;
+use crate::token::Token;
 use crate::variable::Variable;
 
 pub struct TypeChecker {
@@ -16,7 +17,7 @@ impl TypeChecker {
     pub fn new(program: Vec<Instruction>, args: Args) -> Self {
         Self {
             program,
-            environment: ParseEnvironment::new(),
+            environment: ParseEnvironment::new(args.clone()),
             success: true,
             args,
         }
@@ -48,26 +49,12 @@ impl TypeChecker {
             InstructionType::StringLiteral(_) => Ok(Type::String),
             InstructionType::RegexLiteral(_) => Ok(Type::Regex),
             InstructionType::IntegerLiteral(_) => Ok(Type::Int),
+            InstructionType::FloatLiteral(_) => Ok(Type::Float),
             InstructionType::BooleanLiteral(_) => Ok(Type::Bool),
 
             InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
 
-            InstructionType::Block(instructions) => {
-                let mut result = Type::None;
-                self.environment.add_scope();
-                for instruction in instructions {
-                    result = match self.check_instruction(&instruction) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            e.print();
-                            self.success = false;
-                            Type::None
-                        }
-                    }
-                }
-                self.environment.remove_scope();
-                Ok(result)
-            }
+            InstructionType::Block(instructions) => self.check_block(instructions),
 
             InstructionType::Paren(instruction) => self.check_instruction(instruction),
 
@@ -86,18 +73,28 @@ impl TypeChecker {
             }
 
             InstructionType::Variable(variable) => {
-                self.environment.insert(variable.clone());
+                let variable = match self.environment.get(&variable.name) {
+                    Some(v) => {
+                        v.read = true;
+                        v
+                    }
+                    None => variable,
+                };
                 Ok(variable.r#type)
             }
 
             InstructionType::Assignment {
                 variable,
                 instruction,
-            } => self.check_assignment(&variable, &instruction),
+                token,
+                declaration,
+            } => self.check_assignment(&variable, &instruction, token, declaration),
 
-            InstructionType::IterableAssignment(variable, instruction) => {
-                self.check_iterable_assignment(&variable, &instruction)
-            }
+            InstructionType::IterableAssignment {
+                variable,
+                instruction,
+                token,
+            } => self.check_iterable_assignment(&variable, &instruction, token),
 
             InstructionType::UnaryOperation {
                 operator,
@@ -118,7 +115,6 @@ impl TypeChecker {
                 ParseWarning::new(
                     ParseWarningType::TrailingSemicolon,
                     instruction.token.clone(),
-                    "Remove the trailing semicolon",
                 )
                 .print(self.args.disable_warnings);
                 Ok(Type::None)
@@ -190,14 +186,44 @@ impl TypeChecker {
         }
     }
 
+    fn check_block(&mut self, instructions: &Vec<Instruction>) -> Result<Type, ParseError> {
+        self.environment.add_scope();
+        if (instructions.len()) == 0 {
+            return Ok(Type::None);
+        }
+        for instruction in &instructions[..instructions.len() - 1] {
+            match self.check_instruction(&instruction) {
+                Ok(t) => match t {
+                    Type::None => (),
+                    _ => {
+                        ParseWarning::new(
+                            ParseWarningType::UnusedValue,
+                            instruction.inner_most().token.clone(),
+                        )
+                        .print(self.args.disable_warnings);
+                    }
+                },
+                Err(e) => {
+                    e.print();
+                    self.success = false;
+                }
+            }
+        }
+        let result = self.check_instruction(&instructions[instructions.len() - 1])?;
+        self.environment.remove_scope();
+        Ok(result)
+    }
+
     fn check_assignment(
         &mut self,
         variable: &Variable,
         instruction: &Instruction,
+        token: &Token,
+        declaration: &bool,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
 
-        let instruction_type = self.check_instruction(&instruction.clone())?;
+        let instruction_type = self.check_instruction(&instruction)?;
 
         if variable_type != Type::Any && variable_type != instruction_type {
             return Err(ParseError::new(
@@ -205,24 +231,44 @@ impl TypeChecker {
                     expected: vec![variable_type],
                     actual: instruction_type,
                 },
-                instruction.token.clone(),
+                token.clone(),
             ));
         }
 
-        self.environment.insert(variable.clone());
-        Ok(variable_type)
+        let mut variable = match self.environment.get(&variable.name) {
+            Some(v) => v.clone(),
+            None => variable.clone(),
+        };
+        variable.read = false;
+        variable.last_assignment_token = token.clone();
+
+        if !declaration {
+            variable.assigned = true;
+        } else {
+            variable.assigned = false;
+        }
+
+        self.environment.insert(variable);
+        Ok(Type::None)
     }
 
     fn check_iterable_assignment(
         &mut self,
         variable: &Variable,
         instruction: &Instruction,
+        token: &Token,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
         match self.check_instruction(&instruction) {
             Ok(Type::Regex) => match variable_type {
                 Type::String => {
                     self.environment.insert(variable.clone());
+                    match self.environment.get(&variable.name) {
+                        Some(v) => {
+                            v.assigned = true;
+                        }
+                        None => (),
+                    }
                     Ok(variable_type)
                 }
                 _ => Err(ParseError::new(
@@ -230,7 +276,7 @@ impl TypeChecker {
                         expected: vec![Type::Regex],
                         actual: variable_type,
                     },
-                    instruction.token.clone(),
+                    token.clone(),
                 )),
             },
             Ok(t) => Err(ParseError::new(
@@ -238,7 +284,7 @@ impl TypeChecker {
                     expected: vec![Type::Iterable],
                     actual: t,
                 },
-                instruction.token.clone(),
+                token.clone(),
             )),
             Err(e) => Err(e),
         }
@@ -285,6 +331,7 @@ impl TypeChecker {
             BinaryOperator::Subtraction => self.check_subtraction(left, right),
             BinaryOperator::Multiplication => self.check_multiplication(left, right),
             BinaryOperator::Division => self.check_division(left, right),
+            BinaryOperator::Modulo => self.check_modulo(left, right),
 
             BinaryOperator::Equal => self.check_comparison(operator, left, right),
             BinaryOperator::NotEqual => self.check_comparison(operator, left, right),
@@ -309,6 +356,7 @@ impl TypeChecker {
         match (left_type, right_type) {
             (Type::String, Type::String) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::String, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::String],
@@ -343,6 +391,7 @@ impl TypeChecker {
 
         match (left_type, right_type) {
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::Int, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
@@ -371,6 +420,7 @@ impl TypeChecker {
         match (left_type, right_type) {
             (Type::String, Type::Int) => Ok(Type::String),
             (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
             (Type::String, t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
@@ -412,7 +462,42 @@ impl TypeChecker {
                 },
                 right.token.clone(),
             )),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::Float, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Float],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
 
+            (t1, _t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t1,
+                },
+                left.token.clone(),
+            )),
+        }
+    }
+
+    fn check_modulo(
+        &mut self,
+        left: &Instruction,
+        right: &Instruction,
+    ) -> Result<Type, ParseError> {
+        let left_type = self.check_instruction(left)?;
+        let right_type = self.check_instruction(right)?;
+
+        match (left_type, right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Int, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
             (t1, _t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Int],
@@ -441,6 +526,14 @@ impl TypeChecker {
                 },
                 right.token.clone(),
             )),
+            (Type::Float, Type::Float) => Ok(Type::Bool),
+            (Type::Float, t2) => Err(ParseError::new(
+                ParseErrorType::MismatchedType {
+                    expected: vec![Type::Float],
+                    actual: t2,
+                },
+                right.token.clone(),
+            )),
             (Type::String, Type::String) | (Type::Bool, Type::Bool) => match operator {
                 BinaryOperator::Equal | BinaryOperator::NotEqual => Ok(Type::Bool),
                 _ => Err(ParseError::new(
@@ -454,7 +547,7 @@ impl TypeChecker {
 
             (t1, _t2) => Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: vec![t1],
+                    expected: vec![Type::Int, Type::Float],
                     actual: t1,
                 },
                 left.token.clone(),
@@ -524,8 +617,13 @@ impl TypeChecker {
             ));
         }
         let result = self.check_instruction(&instruction)?;
-        let result_else = self.check_instruction(&r#else)?;
-        if result == result_else {
+        let result_else = if *r#else != Instruction::NONE {
+            self.check_instruction(&r#else)?
+        } else {
+            Type::None
+        };
+
+        if result == Type::None || result == result_else {
             Ok(result)
         } else {
             Err(ParseError::new(
@@ -533,7 +631,7 @@ impl TypeChecker {
                     expected: vec![result],
                     actual: result_else,
                 },
-                instruction.token.clone(),
+                r#else.inner_most().token.clone(),
             ))
         }
     }

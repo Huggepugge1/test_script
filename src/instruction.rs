@@ -18,6 +18,7 @@ pub enum BinaryOperator {
     Subtraction,
     Multiplication,
     Division,
+    Modulo,
 }
 
 impl std::fmt::Display for BinaryOperator {
@@ -40,6 +41,7 @@ impl std::fmt::Display for BinaryOperator {
                 BinaryOperator::Subtraction => "-",
                 BinaryOperator::Multiplication => "*",
                 BinaryOperator::Division => "/",
+                BinaryOperator::Modulo => "%",
             }
         )
     }
@@ -52,6 +54,7 @@ impl BinaryOperator {
             BinaryOperator::Subtraction => Self::Addition,
             BinaryOperator::Multiplication => Self::Multiplication,
             BinaryOperator::Division => Self::Multiplication,
+            BinaryOperator::Modulo => Self::Multiplication,
 
             BinaryOperator::Equal => Self::Equal,
             BinaryOperator::NotEqual => Self::Equal,
@@ -113,6 +116,7 @@ impl std::fmt::Display for Instruction {
                 InstructionType::StringLiteral(ref value) => value.clone(),
                 InstructionType::RegexLiteral(ref value) => format!("{:?}", value),
                 InstructionType::IntegerLiteral(ref value) => value.to_string(),
+                InstructionType::FloatLiteral(ref value) => value.to_string(),
                 InstructionType::BooleanLiteral(ref value) => value.to_string(),
 
                 InstructionType::BuiltIn(ref built_in) => match built_in {
@@ -149,8 +153,13 @@ impl std::fmt::Display for Instruction {
                 InstructionType::Assignment {
                     ref variable,
                     ref instruction,
+                    ..
                 } => format!("{} = {}", variable, instruction),
-                InstructionType::IterableAssignment(ref variable, ref instruction) => {
+                InstructionType::IterableAssignment {
+                    ref variable,
+                    ref instruction,
+                    ..
+                } => {
                     format!("{} in {}", variable, instruction)
                 }
                 InstructionType::Variable(ref variable) => variable.to_string(),
@@ -193,6 +202,20 @@ impl Instruction {
     pub fn new(r#type: InstructionType, token: Token) -> Self {
         Self { r#type, token }
     }
+
+    pub fn inner_most(&self) -> &Self {
+        match &self.r#type {
+            InstructionType::Block(ref instructions) => {
+                if instructions.is_empty() {
+                    self
+                } else {
+                    instructions.last().unwrap().inner_most()
+                }
+            }
+            InstructionType::Paren(ref instruction) => instruction.inner_most(),
+            _ => self,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -200,6 +223,7 @@ pub enum InstructionType {
     StringLiteral(String),
     RegexLiteral(Vec<String>),
     IntegerLiteral(i64),
+    FloatLiteral(f64),
     BooleanLiteral(bool),
 
     BuiltIn(BuiltIn),
@@ -218,8 +242,14 @@ pub enum InstructionType {
     Assignment {
         variable: Variable,
         instruction: Box<Instruction>,
+        token: Token,
+        declaration: bool,
     },
-    IterableAssignment(Variable, Box<Instruction>),
+    IterableAssignment {
+        variable: Variable,
+        instruction: Box<Instruction>,
+        token: Token,
+    },
     Variable(Variable),
 
     UnaryOperation {

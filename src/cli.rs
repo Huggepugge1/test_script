@@ -1,3 +1,5 @@
+use crate::error::LexerError;
+use crate::exitcode::ExitCode;
 use crate::test;
 
 use clap::Parser;
@@ -12,17 +14,28 @@ pub struct Args {
     #[clap(short = 'W', long)]
     pub disable_warnings: bool,
 
+    #[clap(short = 'S', long)]
+    pub disable_style_warnings: bool,
+
+    #[clap(short = 'M', long)]
+    pub disable_magic_warnings: bool,
+
     #[clap(short, long, default_value = "3")]
     pub max_size: u32,
+
+    #[clap(short, long)]
+    pub debug: bool,
 }
 
 pub fn run() {
     let args = Args::parse();
 
     if args.file.extension().expect("File extension must be tesc") != "tesc" {
-        panic!("File extension must be tesc");
+        LexerError::FileExtensionNotTesc(&args.file).print();
+        std::process::exit(ExitCode::FileExtentionNotTesc as i32);
     } else if !args.file.exists() {
-        panic!("File not found");
+        LexerError::FileNotFound(&args.file).print();
+        std::process::exit(ExitCode::SourceFileNotFound as i32);
     }
 
     test::run(args);

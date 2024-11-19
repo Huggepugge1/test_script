@@ -9,7 +9,7 @@ test_name("command") { ... }
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
 ## Types
-There are four types, `string`, `regex`, `int` and `bool`.
+The types available are `string`, `regex`, `int` `float` and `bool`.
 
 ### Type casting
 To cast a type to another, use the `as` keyword.
@@ -24,7 +24,7 @@ All variables must be declared with a type.
 
 ### Example
 `let a: string = "Hello, World!";`<br>
-`const b: int = 42;`<br>
+`const B: int = 42;`<br>
 
 ## Blocks
 Blocks are defined by curly braces `{ ... }`.
@@ -114,6 +114,7 @@ Concatenates the two strings a and b.
 #### Supported types
 `string` + `string`<br>
 `int` + `int`<br>
+`float` + `float`<br>
 
 ### Minus
 Subtracts b from a.
@@ -121,6 +122,7 @@ Subtracts b from a.
 `a - b`<br>
 #### Supported types
 `int` - `int`<br>
+`float` - `float`<br>
 
 ### Multiply
 Multiplies a and b.
@@ -128,6 +130,7 @@ Multiplies a and b.
 `a * b`<br>
 #### Supported types
 `int` * `int`<br>
+`float` * `float`<br>
 `string` * `int`<br>
 
 ### Divide
@@ -136,6 +139,7 @@ Divides a by b.
 `a / b`<br>
 #### Supported types
 `int` / `int`<br>
+`float` / `float`<br>
 
 ### Equal
 Checks if a is equal to b.
@@ -143,6 +147,7 @@ Checks if a is equal to b.
 `a == b`<br>
 #### Supported types
 `int` == `int`<br>
+`float` == `float`<br>
 `string` == `string`<br>
 `bool` == `bool`<br>
 
@@ -152,6 +157,7 @@ Checks if a is not equal to b.
 `a != b`<br>
 #### Supported types
 `int` != `int`<br>
+`float` != `float`<br>
 `string` != `string`<br>
 `bool` != `bool`<br>
 
@@ -161,6 +167,7 @@ Checks if a is greater than b.
 `a > b`<br>
 #### Supported types
 `int` > `int`<br>
+`float` > `float`<br>
 
 ### Less than
 Checks if a is less than b.
@@ -168,6 +175,7 @@ Checks if a is less than b.
 `a < b`<br>
 #### Supported types
 `int` < `int`<br>
+`float` < `float`<br>
 
 ### Greater than or equal
 Checks if a is greater than or equal to b.
@@ -175,6 +183,7 @@ Checks if a is greater than or equal to b.
 `a >= b`<br>
 #### Supported types
 `int` >= `int`<br>
+`float` >= `float`<br>
 
 ### Less than or equal
 Checks if a is less than or equal to b.
@@ -182,6 +191,7 @@ Checks if a is less than or equal to b.
 `a <= b`<br>
 #### Supported types
 `int` <= `int`<br>
+`float` <= `float`<br>
 
 ### And
 Checks if a and b are both true.
@@ -206,3 +216,53 @@ Checks if a is false.
 
 ## Comments
 Comments are written by `//`.
+
+## Style Convention
+### Naming
+Variable names should be written in snake_case.
+Constants should be written in UPPER_SNAKE_CASE.
+
+### Indentation
+Indentation should be 4 spaces.
+
+### Line length
+Lines should be at most 80 characters long.
+
+### Curly braces
+Curly braces should be on the same line as the statement.
+
+### Conditionals and loops
+There shoulde be no parentheses around the condition / declaration.
+
+### Magic numbers
+Magic numbers should be avoided.  
+Use constants instead.  
+Use the `-M` flag to disable magic number warnings.  
+
+### Unused values
+All values should be used.  
+If a value is not used, the interpreter will warn about it.  
+Allocate the value to `_` to indicate that it is not used and to tell the interpreter that it is intentional.  
+
+### Unused variables
+Unused variables should be avoided.  
+Use the `_` character to indicate that a variable is unused.  
+The interpreter will not warn about unused variables that start with an underscore.  
+The interpreter will also warn if a variable is assigned but never used after the assignment.
+
+### Constants
+All values that are not reassigned should be declared as constants.  
+
+### Example
+```javascript
+test("./main") {
+    let integer_value: int = 42;
+    const HELLO_WORLD: string = "Hello, World!";
+    if integer_value > 0 {
+        println(HELLO_WORLD);
+    }
+    for i: int in `\\d` {
+        println(i);
+    }
+}
+```
