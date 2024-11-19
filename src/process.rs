@@ -30,7 +30,7 @@ impl Process {
                 }
                 ErrorKind::PermissionDenied => {
                     eprintln!("Permission denied to run command: {}", command);
-                    std::process::exit(ExitCode::PermissionDenied as i32);
+                    std::process::exit(ExitCode::ProcessPermissionDenied as i32);
                 }
                 _ => {
                     eprintln!("Failed to run command: {}", command);
@@ -55,7 +55,7 @@ impl Process {
                 }
                 ErrorKind::PermissionDenied => {
                     eprintln!("Permission denied to run command: {}", command);
-                    std::process::exit(ExitCode::PermissionDenied as i32);
+                    std::process::exit(ExitCode::ProcessPermissionDenied as i32);
                 }
                 _ => {
                     eprintln!("Failed to run command: {}", command);

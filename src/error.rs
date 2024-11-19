@@ -6,20 +6,46 @@ use crate::variable::{SnakeCase, Variable};
 use colored::Colorize;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum LexerError<'a> {
     FileNotFound(&'a PathBuf),
     FileExtensionNotTesc(&'a PathBuf),
+    PermissionDenied(&'a PathBuf),
+
+    Unknown(&'a PathBuf, std::io::Error),
 }
 
 impl<'a> LexerError<'a> {
     pub fn print(&self) {
         match &self {
             LexerError::FileNotFound(path) => {
-                eprintln!("File not found: `{}`", path.display());
+                let error_msg = format!("File not found: `{}`", path.display());
+                eprintln!("{}{}\n", "error: ".bright_red(), error_msg);
             }
             LexerError::FileExtensionNotTesc(path) => {
-                eprintln!("File extension must be `.tesc`: `{}`", path.display());
+                let error_msg = format!("File extension must be `tesc`: `{}`", path.display());
+                eprintln!(
+                    "{}{}\n\
+                     {}{} change this to `tesc`\n",
+                    "error: ".bright_red(),
+                    error_msg,
+                    " ".repeat(
+                        "error: ".len() + error_msg.len()
+                            - 1
+                            - path.extension().unwrap().to_string_lossy().len()
+                    ),
+                    "^".repeat(path.extension().unwrap().to_string_lossy().len())
+                        .bright_yellow()
+                );
+            }
+            LexerError::PermissionDenied(path) => {
+                let error_msg = format!("Permission denied: `{}`", path.display());
+                eprintln!("{}{}\n", "error: ".bright_red(), error_msg);
+            }
+            LexerError::Unknown(path, e) => {
+                let error_msg = format!("Unknown error: `{}`", path.display());
+                eprintln!("{}{}\n", "error: ".bright_red(), error_msg);
+                eprintln!("Rust error: {}\n", e);
             }
         }
     }
