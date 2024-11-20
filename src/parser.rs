@@ -35,6 +35,7 @@ impl Parser {
                 TokenType::Identifier { .. } => self.parse_test(),
                 TokenType::Keyword { value } => match value.as_str() {
                     "const" => self.parse_statement(),
+                    "fn" => self.parse_function(),
                     _ => {
                         self.tokens.advance_to_next_instruction();
                         Err(ParseError::new(
@@ -43,6 +44,13 @@ impl Parser {
                         ))
                     }
                 },
+                TokenType::OpenBlock | TokenType::CloseBlock => {
+                    self.tokens.next();
+                    Err(ParseError::new(
+                        ParseErrorType::GlobalScope(token.clone().r#type),
+                        token.clone(),
+                    ))
+                }
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
