@@ -82,35 +82,67 @@ impl ParseEnvironment {
 }
 
 pub struct Environment {
-    pub variables: Vec<IndexMap<String, InstructionResult>>,
+    pub frames: Vec<Frame>,
+    pub global_constants: IndexMap<String, InstructionResult>,
 }
 
 impl Environment {
     pub fn new() -> Environment {
-        Environment {
-            variables: vec![IndexMap::new()],
+        Self {
+            frames: vec![],
+            global_constants: IndexMap::new(),
         }
     }
 
+    pub fn add_frame(&mut self) {
+        self.frames.push(Frame {
+            variables: vec![IndexMap::new()],
+        });
+    }
+
+    pub fn remove_frame(&mut self) {
+        self.frames.pop();
+    }
+
     pub fn add_scope(&mut self) {
-        self.variables.push(IndexMap::new());
+        let len = self.frames.len();
+        self.frames[len - 1].variables.push(IndexMap::new());
     }
 
     pub fn remove_scope(&mut self) {
-        self.variables.pop();
+        let len = self.frames.len();
+        self.frames[len - 1].variables.pop();
     }
 
     pub fn insert(&mut self, name: String, value: InstructionResult) {
-        self.variables.last_mut().unwrap().insert(name, value);
+        let len = self.frames.len();
+        if len == 0 {
+            self.global_constants.insert(name, value);
+            return;
+        }
+        self.frames[len - 1]
+            .variables
+            .last_mut()
+            .unwrap()
+            .insert(name, value);
     }
 
     pub fn get(&self, name: &str) -> Option<&InstructionResult> {
-        for scope in self.variables.iter().rev() {
+        let len = self.frames.len();
+        for scope in self.frames[len - 1].variables.iter().rev() {
             if let Some(r#type) = scope.get(name) {
                 return Some(r#type);
             }
         }
 
+        if let Some(r#type) = self.global_constants.get(name) {
+            return Some(r#type);
+        }
+
         None
     }
+}
+
+pub struct Frame {
+    pub variables: Vec<IndexMap<String, InstructionResult>>,
 }

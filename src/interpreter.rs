@@ -25,14 +25,17 @@ impl Test {
     }
 
     fn run(&mut self, environment: &mut Environment) {
+        environment.add_frame();
         let instruction = self.instruction.clone();
         match instruction.interpret(environment, &mut Some(&mut self.process)) {
             Ok(_) => (),
             Err(e) => {
                 e.print();
+                environment.remove_frame();
                 return;
             }
         }
+        environment.remove_frame();
 
         match self.process.terminate() {
             Ok(()) => (),
