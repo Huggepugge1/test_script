@@ -1,12 +1,14 @@
 use crate::cli::Args;
 use crate::error::{ParseWarning, ParseWarningType};
-use crate::instruction::InstructionResult;
+use crate::instruction::{Instruction, InstructionResult, InstructionType};
 use crate::variable::Variable;
 
 use indexmap::IndexMap;
 
+#[derive(Debug)]
 pub struct ParseEnvironment {
     pub variables: Vec<IndexMap<String, Variable>>,
+    pub functions: IndexMap<String, Box<Instruction>>,
     pub args: Args,
 }
 
@@ -14,6 +16,7 @@ impl ParseEnvironment {
     pub fn new(args: Args) -> ParseEnvironment {
         ParseEnvironment {
             variables: vec![IndexMap::new()],
+            functions: IndexMap::new(),
             args,
         }
     }
@@ -79,11 +82,25 @@ impl ParseEnvironment {
             }
         }
     }
+
+    pub fn add_function(&mut self, function: Box<Instruction>) {
+        match &function.r#type {
+            InstructionType::Function { name, .. } => {
+                self.functions.insert(name.to_string(), function);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_function(&self, name: &str) -> Option<&Box<Instruction>> {
+        self.functions.get(name)
+    }
 }
 
 pub struct Environment {
     pub frames: Vec<Frame>,
     pub global_constants: IndexMap<String, InstructionResult>,
+    pub functions: IndexMap<String, Instruction>,
 }
 
 impl Environment {
@@ -91,6 +108,7 @@ impl Environment {
         Self {
             frames: vec![],
             global_constants: IndexMap::new(),
+            functions: IndexMap::new(),
         }
     }
 
@@ -120,7 +138,9 @@ impl Environment {
             self.global_constants.insert(name, value);
             return;
         }
-        self.frames[len - 1]
+        self.frames
+            .last_mut()
+            .unwrap()
             .variables
             .last_mut()
             .unwrap()
@@ -129,20 +149,33 @@ impl Environment {
 
     pub fn get(&self, name: &str) -> Option<&InstructionResult> {
         let len = self.frames.len();
+        if len == 0 {
+            return self.global_constants.get(name);
+        }
         for scope in self.frames[len - 1].variables.iter().rev() {
             if let Some(r#type) = scope.get(name) {
                 return Some(r#type);
             }
         }
 
-        if let Some(r#type) = self.global_constants.get(name) {
-            return Some(r#type);
-        }
+        self.global_constants.get(name)
+    }
 
-        None
+    pub fn add_function(&mut self, function: Instruction) {
+        match &function.r#type {
+            InstructionType::Function { name, .. } => {
+                self.functions.insert(name.to_string(), function);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_function(&self, name: &str) -> Option<&Instruction> {
+        self.functions.get(name)
     }
 }
 
+#[derive(Debug)]
 pub struct Frame {
     pub variables: Vec<IndexMap<String, InstructionResult>>,
 }

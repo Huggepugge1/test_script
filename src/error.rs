@@ -62,6 +62,10 @@ pub enum ParseErrorType {
         expected: Vec<Type>,
         actual: Type,
     },
+    MismatchedArguments {
+        expected: usize,
+        actual: usize,
+    },
     MismatchedTokenType {
         expected: TokenType,
         actual: TokenType,
@@ -77,6 +81,7 @@ pub enum ParseErrorType {
     RegexError,
 
     IdentifierNotDefined(String),
+
     ConstantReassignment(Variable),
 
     VaribleTypeAnnotation,
@@ -143,6 +148,10 @@ impl std::fmt::Display for ParseErrorType {
                     _ => format!("{expected}"),
                 };
                 write!(f, "Expected {expected}, found {actual}")
+            }
+
+            ParseErrorType::MismatchedArguments { expected, actual } => {
+                write!(f, "Expected {} arguments, found {}", expected, actual)
             }
 
             ParseErrorType::GlobalScope(token) => {

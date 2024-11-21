@@ -20,6 +20,7 @@ impl Type {
             "int" => Type::Int,
             "float" => Type::Float,
             "bool" => Type::Bool,
+            "None" => Type::None,
             _ => panic!("Invalid type"),
         }
     }
@@ -28,14 +29,14 @@ impl Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Type::String => write!(f, "String"),
-            Type::Regex => write!(f, "Regex"),
-            Type::Int => write!(f, "Int"),
-            Type::Float => write!(f, "Float"),
-            Type::Bool => write!(f, "Bool"),
-            Type::None => write!(f, "()"),
+            Type::String => write!(f, "string"),
+            Type::Regex => write!(f, "regex"),
+            Type::Int => write!(f, "int"),
+            Type::Float => write!(f, "float"),
+            Type::Bool => write!(f, "bool"),
+            Type::None => write!(f, "none"),
 
-            Type::Iterable => write!(f, "Iterable"),
+            Type::Iterable => write!(f, "iterable"),
 
             Type::Any => write!(f, "T"),
         }
