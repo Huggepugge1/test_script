@@ -42,6 +42,7 @@ impl TypeChecker {
                         self.success = false;
                     }
                 },
+
                 InstructionType::Assignment {
                     variable: _variable,
                     instruction,

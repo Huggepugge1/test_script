@@ -96,6 +96,7 @@ impl Interpreter {
                 InstructionType::Function { .. } => {
                     let _ = instruction.interpret(&mut self.environment, &mut None);
                 }
+
                 InstructionType::Assignment {
                     variable,
                     instruction,

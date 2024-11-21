@@ -164,6 +164,7 @@ impl std::fmt::Display for Instruction {
                 InstructionType::Test(ref left, ref operator, ref right) => {
                     format!("{} {} {}", left, operator, right)
                 }
+
                 InstructionType::Function {
                     ref name,
                     ref parameters,
@@ -180,6 +181,7 @@ impl std::fmt::Display for Instruction {
                     result.push_str(&format!(") {{\n{}\n}}", instruction));
                     result
                 }
+
                 InstructionType::For {
                     ref assignment,
                     ref instruction,
@@ -293,6 +295,7 @@ impl Instruction {
 
             InstructionType::For { .. } => self.interpret_for(environment, process)?,
             InstructionType::Function { .. } => self.interpret_function(environment, process)?,
+
             InstructionType::Conditional { .. } => {
                 self.interpret_conditional(environment, process)?
             }
@@ -300,6 +303,7 @@ impl Instruction {
             InstructionType::Assignment { .. } => {
                 self.interpret_assignment(environment, process)?
             }
+
             InstructionType::IterableAssignment { instruction, .. } => {
                 instruction.interpret(environment, process)?
             }
@@ -572,7 +576,7 @@ impl Instruction {
         Ok(result)
     }
 
-    fn interpret_unary_operation(
+  fn interpret_unary_operation(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

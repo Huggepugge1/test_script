@@ -51,6 +51,7 @@ impl Parser {
                         token.clone(),
                     ))
                 }
+
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
