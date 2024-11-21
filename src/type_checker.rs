@@ -35,6 +35,14 @@ impl TypeChecker {
                         }
                     }
                 }
+                InstructionType::Function { .. } => match self.check_instruction(&instruction) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        e.print();
+                        self.success = false;
+                    }
+                },
+
                 InstructionType::Assignment {
                     variable: _variable,
                     instruction,
@@ -76,6 +84,8 @@ impl TypeChecker {
                 r#else,
             } => self.check_conditional(condition, instruction, r#else),
 
+            InstructionType::Function { .. } => self.check_function(instruction),
+
             InstructionType::For {
                 assignment,
                 instruction,
@@ -96,6 +106,10 @@ impl TypeChecker {
                     None => variable,
                 };
                 Ok(variable.r#type)
+            }
+
+            InstructionType::FunctionCall { name, arguments } => {
+                self.check_function_call(name, arguments)
             }
 
             InstructionType::Assignment {
@@ -612,6 +626,70 @@ impl TypeChecker {
                 },
                 instruction.token.clone(),
             )),
+        }
+    }
+
+    fn check_function(&mut self, instruction: &Instruction) -> Result<Type, ParseError> {
+        let (parameters, statement) = match &instruction.r#type {
+            InstructionType::Function {
+                parameters,
+                instruction,
+                ..
+            } => (parameters, instruction),
+            _ => unreachable!(),
+        };
+        self.environment.add_function(Box::new(instruction.clone()));
+
+        self.environment.add_scope();
+        for parameter in parameters {
+            self.environment.insert(parameter.clone());
+        }
+        let result = self.check_instruction(statement);
+        self.environment.remove_scope();
+        result
+    }
+
+    fn check_function_call(
+        &mut self,
+        name: &str,
+        arguments: &Vec<Instruction>,
+    ) -> Result<Type, ParseError> {
+        match &self.environment.functions.get(name).cloned() {
+            Some(instruction) => {
+                let (parameters, return_type) = match &instruction.r#type {
+                    InstructionType::Function {
+                        parameters,
+                        return_type,
+                        ..
+                    } => (parameters, return_type),
+                    _ => unreachable!(),
+                };
+
+                if parameters.len() != arguments.len() {
+                    return Err(ParseError::new(
+                        ParseErrorType::MismatchedArguments {
+                            expected: parameters.len(),
+                            actual: arguments.len(),
+                        },
+                        arguments[arguments.len() - 1].token.clone(),
+                    ));
+                }
+
+                for (parameter, argument) in parameters.iter().zip(arguments.iter()) {
+                    let argument_type = self.check_instruction(argument)?;
+                    if parameter.r#type != argument_type {
+                        return Err(ParseError::new(
+                            ParseErrorType::MismatchedType {
+                                expected: vec![parameter.r#type],
+                                actual: argument_type,
+                            },
+                            argument.token.clone(),
+                        ));
+                    }
+                }
+                Ok(*return_type)
+            }
+            None => unreachable!(),
         }
     }
 

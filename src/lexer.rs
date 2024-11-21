@@ -60,10 +60,10 @@ impl<'a> Lexer<'a> {
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
         match value.as_str() {
-            "for" | "let" | "const" | "if" | "else" => TokenType::Keyword {
+            "for" | "let" | "const" | "if" | "else" | "fn" => TokenType::Keyword {
                 value: value.to_string(),
             },
-            "string" | "regex" | "int" | "float" | "bool" => TokenType::Type {
+            "string" | "regex" | "int" | "float" | "bool" | "none" => TokenType::Type {
                 value: Type::from(value),
             },
             "true" | "false" => TokenType::BooleanLiteral {
@@ -196,6 +196,7 @@ impl<'a> Lexer<'a> {
                 '(' => self.tokens.push(self.make_token(TokenType::OpenParen)),
                 ')' => self.tokens.push(self.make_token(TokenType::CloseParen)),
                 ';' => self.tokens.push(self.make_token(TokenType::Semicolon)),
+                ',' => self.tokens.push(self.make_token(TokenType::Comma)),
                 '+' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
                     value: "+".to_string(),
                 })),

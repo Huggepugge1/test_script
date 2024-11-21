@@ -1,12 +1,14 @@
 use crate::cli::Args;
 use crate::error::{ParseWarning, ParseWarningType};
-use crate::instruction::InstructionResult;
+use crate::instruction::{Instruction, InstructionResult, InstructionType};
 use crate::variable::Variable;
 
 use indexmap::IndexMap;
 
+#[derive(Debug)]
 pub struct ParseEnvironment {
     pub variables: Vec<IndexMap<String, Variable>>,
+    pub functions: IndexMap<String, Box<Instruction>>,
     pub args: Args,
 }
 
@@ -14,6 +16,7 @@ impl ParseEnvironment {
     pub fn new(args: Args) -> ParseEnvironment {
         ParseEnvironment {
             variables: vec![IndexMap::new()],
+            functions: IndexMap::new(),
             args,
         }
     }
@@ -79,38 +82,100 @@ impl ParseEnvironment {
             }
         }
     }
+
+    pub fn add_function(&mut self, function: Box<Instruction>) {
+        match &function.r#type {
+            InstructionType::Function { name, .. } => {
+                self.functions.insert(name.to_string(), function);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_function(&self, name: &str) -> Option<&Box<Instruction>> {
+        self.functions.get(name)
+    }
 }
 
 pub struct Environment {
-    pub variables: Vec<IndexMap<String, InstructionResult>>,
+    pub frames: Vec<Frame>,
+    pub global_constants: IndexMap<String, InstructionResult>,
+    pub functions: IndexMap<String, Instruction>,
 }
 
 impl Environment {
     pub fn new() -> Environment {
-        Environment {
-            variables: vec![IndexMap::new()],
+        Self {
+            frames: vec![],
+            global_constants: IndexMap::new(),
+            functions: IndexMap::new(),
         }
     }
 
+    pub fn add_frame(&mut self) {
+        self.frames.push(Frame {
+            variables: vec![IndexMap::new()],
+        });
+    }
+
+    pub fn remove_frame(&mut self) {
+        self.frames.pop();
+    }
+
     pub fn add_scope(&mut self) {
-        self.variables.push(IndexMap::new());
+        let len = self.frames.len();
+        self.frames[len - 1].variables.push(IndexMap::new());
     }
 
     pub fn remove_scope(&mut self) {
-        self.variables.pop();
+        let len = self.frames.len();
+        self.frames[len - 1].variables.pop();
     }
 
     pub fn insert(&mut self, name: String, value: InstructionResult) {
-        self.variables.last_mut().unwrap().insert(name, value);
+        let len = self.frames.len();
+        if len == 0 {
+            self.global_constants.insert(name, value);
+            return;
+        }
+        self.frames
+            .last_mut()
+            .unwrap()
+            .variables
+            .last_mut()
+            .unwrap()
+            .insert(name, value);
     }
 
     pub fn get(&self, name: &str) -> Option<&InstructionResult> {
-        for scope in self.variables.iter().rev() {
+        let len = self.frames.len();
+        if len == 0 {
+            return self.global_constants.get(name);
+        }
+        for scope in self.frames[len - 1].variables.iter().rev() {
             if let Some(r#type) = scope.get(name) {
                 return Some(r#type);
             }
         }
 
-        None
+        self.global_constants.get(name)
     }
+
+    pub fn add_function(&mut self, function: Instruction) {
+        match &function.r#type {
+            InstructionType::Function { name, .. } => {
+                self.functions.insert(name.to_string(), function);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_function(&self, name: &str) -> Option<&Instruction> {
+        self.functions.get(name)
+    }
+}
+
+#[derive(Debug)]
+pub struct Frame {
+    pub variables: Vec<IndexMap<String, InstructionResult>>,
 }

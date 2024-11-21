@@ -25,14 +25,17 @@ impl Test {
     }
 
     fn run(&mut self, environment: &mut Environment) {
+        environment.add_frame();
         let instruction = self.instruction.clone();
         match instruction.interpret(environment, &mut Some(&mut self.process)) {
             Ok(_) => (),
             Err(e) => {
                 e.print();
+                environment.remove_frame();
                 return;
             }
         }
+        environment.remove_frame();
 
         match self.process.terminate() {
             Ok(()) => (),
@@ -87,9 +90,13 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self) {
-        for test in self.program.clone().into_iter() {
-            match test.r#type {
-                InstructionType::Test(_, _, _) => self.interpret_test(test),
+        for instruction in self.program.clone().into_iter() {
+            match instruction.r#type {
+                InstructionType::Test(_, _, _) => self.interpret_test(instruction),
+                InstructionType::Function { .. } => {
+                    let _ = instruction.interpret(&mut self.environment, &mut None);
+                }
+
                 InstructionType::Assignment {
                     variable,
                     instruction,

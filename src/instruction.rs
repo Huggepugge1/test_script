@@ -164,6 +164,24 @@ impl std::fmt::Display for Instruction {
                 InstructionType::Test(ref left, ref operator, ref right) => {
                     format!("{} {} {}", left, operator, right)
                 }
+
+                InstructionType::Function {
+                    ref name,
+                    ref parameters,
+                    ref instruction,
+                    ..
+                } => {
+                    let mut result = format!("fn {}(", name);
+                    for (index, parameter) in parameters.iter().enumerate() {
+                        result.push_str(&format!("{}", parameter));
+                        if index < parameters.len() - 1 {
+                            result.push_str(", ");
+                        }
+                    }
+                    result.push_str(&format!(") {{\n{}\n}}", instruction));
+                    result
+                }
+
                 InstructionType::For {
                     ref assignment,
                     ref instruction,
@@ -190,6 +208,20 @@ impl std::fmt::Display for Instruction {
                     format!("{} in {}", variable, instruction)
                 }
                 InstructionType::Variable(ref variable) => variable.to_string(),
+                InstructionType::FunctionCall {
+                    ref name,
+                    ref arguments,
+                } => {
+                    let mut result = format!("{}(", name);
+                    for (index, argument) in arguments.iter().enumerate() {
+                        result.push_str(&format!("{}", argument));
+                        if index < arguments.len() - 1 {
+                            result.push_str(", ");
+                        }
+                    }
+                    result.push_str(")");
+                    result
+                }
 
                 InstructionType::UnaryOperation {
                     ref operator,
@@ -262,6 +294,8 @@ impl Instruction {
             InstructionType::Paren(instruction) => instruction.interpret(environment, process)?,
 
             InstructionType::For { .. } => self.interpret_for(environment, process)?,
+            InstructionType::Function { .. } => self.interpret_function(environment, process)?,
+
             InstructionType::Conditional { .. } => {
                 self.interpret_conditional(environment, process)?
             }
@@ -269,7 +303,14 @@ impl Instruction {
             InstructionType::Assignment { .. } => {
                 self.interpret_assignment(environment, process)?
             }
+
+            InstructionType::IterableAssignment { instruction, .. } => {
+                instruction.interpret(environment, process)?
+            }
             InstructionType::Variable(..) => self.interpret_variable(environment, process)?,
+            InstructionType::FunctionCall { .. } => {
+                self.interpret_function_call(environment, process)?
+            }
 
             InstructionType::None => InstructionResult::None,
 
@@ -416,6 +457,15 @@ impl Instruction {
         Ok(result)
     }
 
+    fn interpret_function(
+        &self,
+        environment: &mut Environment,
+        _process: &mut Option<&mut Process>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        environment.add_function(self.clone());
+        Ok(InstructionResult::None)
+    }
+
     fn interpret_conditional(
         &self,
         environment: &mut Environment,
@@ -459,6 +509,11 @@ impl Instruction {
                 instruction,
                 ..
             } => (variable, instruction),
+            InstructionType::IterableAssignment {
+                variable,
+                instruction,
+                ..
+            } => (variable, instruction),
             _ => {
                 unreachable!()
             }
@@ -485,7 +540,43 @@ impl Instruction {
         Ok(value.clone())
     }
 
-    fn interpret_unary_operation(
+    fn interpret_function_call(
+        &self,
+        environment: &mut Environment,
+        process: &mut Option<&mut Process>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let (name, arguments) = match &self.r#type {
+            InstructionType::FunctionCall { name, arguments } => (name, arguments),
+            _ => unreachable!(),
+        };
+
+        let function = environment.get_function(&name).cloned().unwrap();
+        let (parameters, instruction) = match &function.r#type {
+            InstructionType::Function {
+                parameters,
+                instruction,
+                ..
+            } => (parameters, instruction),
+            _ => unreachable!(),
+        };
+
+        let argument_values = arguments
+            .iter()
+            .map(|argument| argument.interpret(environment, process))
+            .collect::<Result<Vec<InstructionResult>, InterpreterError>>()?;
+
+        environment.add_frame();
+
+        for (parameter, argument) in parameters.iter().zip(argument_values.iter()) {
+            environment.insert(parameter.name.clone(), argument.clone());
+        }
+
+        let result = instruction.interpret(environment, process)?;
+        environment.remove_frame();
+        Ok(result)
+    }
+
+  fn interpret_unary_operation(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,
@@ -1011,6 +1102,12 @@ pub enum InstructionType {
     Paren(Box<Instruction>),
 
     Test(Box<Instruction>, String, String),
+    Function {
+        name: String,
+        parameters: Vec<Variable>,
+        instruction: Box<Instruction>,
+        return_type: Type,
+    },
     For {
         assignment: Box<Instruction>,
         instruction: Box<Instruction>,
@@ -1032,7 +1129,12 @@ pub enum InstructionType {
         instruction: Box<Instruction>,
         token: Token,
     },
+
     Variable(Variable),
+    FunctionCall {
+        name: String,
+        arguments: Vec<Instruction>,
+    },
 
     UnaryOperation {
         operator: UnaryOperator,

@@ -38,6 +38,8 @@ pub enum TokenType {
 
     Semicolon,
 
+    Comma,
+
     None,
 }
 
@@ -77,6 +79,7 @@ impl std::fmt::Display for TokenType {
             TokenType::BinaryOperator { value } => write!(f, "binary operator `{value}`"),
 
             TokenType::Semicolon => write!(f, ";"),
+            TokenType::Comma => write!(f, ","),
 
             TokenType::None => write!(f, ""),
         }
@@ -146,6 +149,7 @@ impl Token {
             TokenType::BinaryOperator { value } => value.len(),
 
             TokenType::Semicolon => 1,
+            TokenType::Comma => 1,
 
             TokenType::None => 0,
         }

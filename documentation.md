@@ -214,6 +214,27 @@ Checks if a is false.
 #### Supported types
 `!bool`<br>
 
+## Functions
+Functions are declared with the `fn` keyword.  
+
+### Syntax
+`fn function_name(arg1: type, arg2: type, ...): return_type { ... }
+
+### Note
+There is no return keyword.
+Instead, the value of the last statement in the function is returned.
+
+### Example
+```javascript
+fn min(a: int, b: int): int {
+    if a < b {
+        a;
+    } else {
+        b;
+    }
+}
+```
+
 ## Comments
 Comments are written by `//`.
 

@@ -35,6 +35,7 @@ impl Parser {
                 TokenType::Identifier { .. } => self.parse_test(),
                 TokenType::Keyword { value } => match value.as_str() {
                     "const" => self.parse_statement(),
+                    "fn" => self.parse_function(),
                     _ => {
                         self.tokens.advance_to_next_instruction();
                         Err(ParseError::new(
@@ -43,6 +44,14 @@ impl Parser {
                         ))
                     }
                 },
+                TokenType::OpenBlock | TokenType::CloseBlock => {
+                    self.tokens.next();
+                    Err(ParseError::new(
+                        ParseErrorType::GlobalScope(token.clone().r#type),
+                        token.clone(),
+                    ))
+                }
+
                 r#type => {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
@@ -161,6 +170,208 @@ impl Parser {
             InstructionType::Test(Box::new(instruction), name.to_string(), path.into()),
             token,
         ))
+    }
+
+    fn parse_function(&mut self) -> Result<Instruction, ParseError> {
+        let token = self.get_next_token()?;
+        let name = self.get_next_token()?;
+        let name = match &name.r#type {
+            TokenType::Identifier { value } => value,
+            r#type => Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType {
+                    expected: TokenType::Identifier {
+                        value: String::new(),
+                    },
+                    actual: r#type.clone(),
+                },
+                name.clone(),
+            ))?,
+        };
+
+        self.expect_token(TokenType::OpenParen)?;
+        let parameters = self.parse_parameters()?;
+        self.expect_token(TokenType::CloseParen)?;
+        self.expect_token(TokenType::Colon)?;
+        let return_type = match &self.get_next_token()? {
+            Token {
+                r#type: TokenType::Type { value },
+                ..
+            } => value.clone(),
+            return_type => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::Type { value: Type::Any },
+                        actual: return_type.r#type.clone(),
+                    },
+                    return_type.clone(),
+                ));
+            }
+        };
+        let function = Instruction::new(
+            InstructionType::Function {
+                name: name.to_string(),
+                parameters: parameters.clone(),
+                instruction: Box::new(Instruction::NONE),
+                return_type,
+            },
+            token.clone(),
+        );
+        self.environment.add_function(Box::new(function.clone()));
+        self.environment.add_scope();
+        for parameter in parameters.iter() {
+            self.environment.insert(parameter.clone());
+        }
+        let instruction = self.parse_statement()?;
+        self.environment.remove_scope();
+        let function = Instruction::new(
+            InstructionType::Function {
+                name: name.to_string(),
+                parameters,
+                instruction: Box::new(instruction),
+                return_type,
+            },
+            token.clone(),
+        );
+        self.environment.add_function(Box::new(function.clone()));
+        Ok(function)
+    }
+
+    fn parse_parameters(&mut self) -> Result<Vec<Variable>, ParseError> {
+        let mut arguments = Vec::new();
+        let mut r#const = false;
+        while let Some(token) = self.tokens.peek() {
+            match token.r#type {
+                TokenType::CloseParen => {
+                    break;
+                }
+                TokenType::Keyword { ref value } => {
+                    if value != "const" {
+                        self.tokens.advance_to_next_instruction();
+                        return Err(ParseError::new(
+                            ParseErrorType::MismatchedTokenType {
+                                expected: TokenType::Identifier {
+                                    value: String::new(),
+                                },
+                                actual: token.r#type.clone(),
+                            },
+                            token.clone(),
+                        ));
+                    }
+                    r#const = true;
+                }
+                TokenType::Identifier { .. } => {
+                    arguments.push(self.parse_parameter(r#const)?);
+                    match self.peek_next_token()?.r#type {
+                        TokenType::Comma => {
+                            self.get_next_token()?;
+                            continue;
+                        }
+                        TokenType::CloseParen => {
+                            break;
+                        }
+                        _ => {
+                            self.tokens.advance_to_next_instruction();
+                            return Err(ParseError::new(
+                                ParseErrorType::MismatchedTokenType {
+                                    expected: TokenType::Comma,
+                                    actual: self.peek_next_token()?.r#type,
+                                },
+                                self.peek_next_token()?,
+                            ));
+                        }
+                    }
+                }
+                _ => {
+                    self.tokens.advance_to_next_instruction();
+                    return Err(ParseError::new(
+                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                        token.clone(),
+                    ));
+                }
+            }
+        }
+        Ok(arguments)
+    }
+
+    fn parse_parameter(&mut self, r#const: bool) -> Result<Variable, ParseError> {
+        let token = self.get_next_token()?;
+        let name = match &token.r#type {
+            TokenType::Identifier { value } => value,
+            _ => Err(ParseError::new(
+                ParseErrorType::MismatchedTokenType {
+                    expected: TokenType::Identifier {
+                        value: String::new(),
+                    },
+                    actual: token.r#type.clone(),
+                },
+                token.clone(),
+            ))?,
+        };
+
+        self.expect_token(TokenType::Colon)?;
+
+        let r#type = match &self.get_next_token()? {
+            Token {
+                r#type: TokenType::Type { value },
+                ..
+            } => value.clone(),
+            r#type => {
+                self.tokens.advance_to_next_instruction();
+                return Err(ParseError::new(
+                    ParseErrorType::MismatchedTokenType {
+                        expected: TokenType::Type { value: Type::Any },
+                        actual: r#type.r#type.clone(),
+                    },
+                    r#type.clone(),
+                ));
+            }
+        };
+
+        Ok(Variable {
+            name: name.to_string(),
+            r#const,
+            r#type,
+            declaration_token: token.clone(),
+            identifier_token: token.clone(),
+            last_assignment_token: token.clone(),
+            read: true,
+            assigned: true,
+        })
+    }
+
+    fn parse_arguments(&mut self) -> Result<Vec<Instruction>, ParseError> {
+        let mut arguments = Vec::new();
+        while let Some(token) = self.tokens.peek() {
+            match token.r#type {
+                TokenType::CloseParen => {
+                    break;
+                }
+                _ => {
+                    arguments.push(self.parse_expression(true, true)?);
+                    match self.peek_next_token()?.r#type {
+                        TokenType::Comma => {
+                            self.get_next_token()?;
+                            continue;
+                        }
+                        TokenType::CloseParen => {
+                            break;
+                        }
+                        _ => {
+                            self.tokens.advance_to_next_instruction();
+                            return Err(ParseError::new(
+                                ParseErrorType::MismatchedTokenType {
+                                    expected: TokenType::Comma,
+                                    actual: self.peek_next_token()?.r#type,
+                                },
+                                self.peek_next_token()?,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(arguments)
     }
 
     fn parse_string_literal(&mut self) -> Result<Instruction, ParseError> {
@@ -656,11 +867,24 @@ impl Parser {
         let token = self.get_next_token()?;
         match &token.r#type {
             TokenType::Identifier { value } => {
-                if self.environment.get(&value).is_none() {
+                let variable = self.environment.get(value).cloned();
+                let function = self.environment.get_function(value);
+                if variable.is_none() && function.is_none() {
                     self.tokens.advance_to_next_instruction();
                     Err(ParseError::new(
                         ParseErrorType::IdentifierNotDefined(value.clone()),
                         token.clone(),
+                    ))
+                } else if function.is_some() {
+                    self.expect_token(TokenType::OpenParen)?;
+                    let arguments = self.parse_arguments()?;
+                    self.expect_token(TokenType::CloseParen)?;
+                    Ok(Instruction::new(
+                        InstructionType::FunctionCall {
+                            name: value.to_string(),
+                            arguments,
+                        },
+                        token,
                     ))
                 } else {
                     Ok(Instruction::new(
