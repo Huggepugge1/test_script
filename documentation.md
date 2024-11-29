@@ -233,6 +233,14 @@ fn min(a: int, b: int): int {
         b;
     }
 }
+
+fn fib(n: int): int {
+    if n <= 1 {
+        n;
+    } else {
+        fib(n - 1) + fib(n - 2);
+    }
+}
 ```
 
 ## Comments
