@@ -12,10 +12,42 @@ pub struct Process {
     debug: bool,
 }
 
+fn split_command(command: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current_arg = String::new();
+    let mut in_quotes = false;
+
+    for c in command.chars() {
+        match c {
+            '\'' if in_quotes => {
+                in_quotes = false; // End of a quoted argument
+            }
+            '\'' => {
+                in_quotes = true; // Start of a quoted argument
+            }
+            ' ' if !in_quotes => {
+                if !current_arg.is_empty() {
+                    args.push(current_arg.clone());
+                    current_arg.clear();
+                }
+            }
+            _ => {
+                current_arg.push(c); // Part of the current argument
+            }
+        }
+    }
+
+    if !current_arg.is_empty() {
+        args.push(current_arg);
+    }
+
+    args
+}
+
 impl Process {
     pub fn new(command: &str, debug: bool) -> Self {
-        let command_vec = command.split_whitespace().collect::<Vec<&str>>();
-        let child = Command::new(command_vec[0])
+        let command_vec = split_command(command);
+        let child = Command::new(command_vec[0].clone())
             .args(command_vec[1..].iter())
             .spawn();
 
@@ -42,7 +74,7 @@ impl Process {
         let mut child = match Command::new("stdbuf")
             .arg("-o0")
             .arg("-e0")
-            .arg(command)
+            .args(command_vec.iter())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
