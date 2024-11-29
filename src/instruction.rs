@@ -576,7 +576,7 @@ impl Instruction {
         Ok(result)
     }
 
-  fn interpret_unary_operation(
+    fn interpret_unary_operation(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

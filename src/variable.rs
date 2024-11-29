@@ -28,6 +28,12 @@ impl std::fmt::Display for Variable {
     }
 }
 
+impl std::hash::Hash for Variable {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
 pub trait SnakeCase {
     fn is_snake_case(&self) -> bool;
     fn is_upper_snake_case(&self) -> bool;

@@ -20,7 +20,7 @@ impl Type {
             "int" => Type::Int,
             "float" => Type::Float,
             "bool" => Type::Bool,
-            "None" => Type::None,
+            "none" => Type::None,
             _ => panic!("Invalid type"),
         }
     }
