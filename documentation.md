@@ -9,12 +9,12 @@ test_name("command") { ... }
 The command is the command to run the program you are trying to test. For example if I have a project called `hash` written in c with a main file called main.c that compiles to main, you would write "./main" instead of "command". The field can also include for example `make` or `java`.
 
 ## Types
-The types available are `string`, `regex`, `int` `float` and `bool`.
+The types available are `string`, `regex`, `int` `float`, `bool`, `none`.
 
 ### Type casting
 To cast a type to another, use the `as` keyword.
 #### Syntax
-`a as T`<br>
+`a as T`  
 
 ## Variables
 Variables are declared with the `let` keyword.
@@ -23,8 +23,8 @@ A constant cannot be reassigned.
 All variables must be declared with a type.
 
 ### Example
-`let a: string = "Hello, World!";`<br>
-`const B: int = 42;`<br>
+`let a: string = "Hello, World!";`  
+`const B: int = 42;`  
 
 ## Blocks
 Blocks are defined by curly braces `{ ... }`.
@@ -38,23 +38,23 @@ The language is designed to test IO. There is two builtins that handle IO, `inpu
 ### Input
 Sends the line string to the program being tested. Adds a new line at the end of the string. 
 #### Syntax
-`input(string)`<br>
+`input(string)`  
 
 ### Output
 Expect the next line of the programs Output to be string. Adds a new line at the end of the string.
 #### Syntax
-`output(string)`<br>
+`output(string)`  
 
 ## Builtins
 ### Print
 Print the string to the console. No extra newline.
 #### Syntax
-`print(string)`<br>
+`print(string)`  
 
 ### Println
 Print the string to the console. Adds a newline at the end of the string.
 #### Syntax
-`println(string)`<br>
+`println(string)`  
 
 ## Conditionals
 The only conditional available is the if/else statement.
@@ -63,17 +63,17 @@ The only conditional available is the if/else statement.
 If the condition is true, run the next statement.
 All conditions must be of type `bool`.
 #### Syntax
-`if condition { ... }`<br>
+`if condition { ... }`  
 
 ### Else
 If the condition was false, run the next statement.
 #### Syntax
-`if condition { ... } else { ... }`<br>
+`if condition { ... } else { ... }`  
 
 ### Else if
 If the condition was false, check the next condition.
 #### Syntax
-`if condition { ... } else if condition { ... }`<br>
+`if condition { ... } else if condition { ... }`  
 
 ## Loops
 The only loop available is the for loop.
@@ -81,7 +81,7 @@ The only loop available is the for loop.
 ### For
 For each element in the iterable, name it var_name and run the next statement.
 #### Syntax
-`for var_name: var_type in iterable { ... }`<br>
+`for var_name: var_type in iterable { ... }`  
 
 ## Iterables
 The only iterable available is the regular expression (regex).
@@ -105,120 +105,120 @@ would create an iterable containg all digits 0-9.
 ### Assignment
 Assigns the value of b to a. The let keyword is not needed when assigning a value to a variable that has already been defined.
 #### Syntax
-`a = b`<br>
+`a = b`  
 
 ### Plus
 Concatenates the two strings a and b.
 #### Syntax
-`a + b`<br>
+`a + b`  
 #### Supported types
-`string` + `string`<br>
-`int` + `int`<br>
-`float` + `float`<br>
+`string` + `string`  
+`int` + `int`  
+`float` + `float`  
 
 ### Minus
 Subtracts b from a.
 #### Syntax
-`a - b`<br>
+`a - b`  
 #### Supported types
-`int` - `int`<br>
-`float` - `float`<br>
+`int` - `int`  
+`float` - `float`  
 
 ### Multiply
 Multiplies a and b.
 #### Syntax
-`a * b`<br>
+`a * b`  
 #### Supported types
-`int` * `int`<br>
-`float` * `float`<br>
-`string` * `int`<br>
+`int` * `int`  
+`float` * `float`  
+`string` * `int`  
 
 ### Divide
 Divides a by b.
 #### Syntax
-`a / b`<br>
+`a / b`  
 #### Supported types
-`int` / `int`<br>
-`float` / `float`<br>
+`int` / `int`  
+`float` / `float`  
 
 ### Equal
 Checks if a is equal to b.
 #### Syntax
-`a == b`<br>
+`a == b`  
 #### Supported types
-`int` == `int`<br>
-`float` == `float`<br>
-`string` == `string`<br>
-`bool` == `bool`<br>
+`int` == `int`  
+`float` == `float`  
+`string` == `string`  
+`bool` == `bool`  
 
 ### Not equal
 Checks if a is not equal to b.
 #### Syntax
-`a != b`<br>
+`a != b`  
 #### Supported types
-`int` != `int`<br>
-`float` != `float`<br>
-`string` != `string`<br>
-`bool` != `bool`<br>
+`int` != `int`  
+`float` != `float`  
+`string` != `string`  
+`bool` != `bool`  
 
 ### Greater than
 Checks if a is greater than b.
 #### Syntax
-`a > b`<br>
+`a > b`  
 #### Supported types
-`int` > `int`<br>
-`float` > `float`<br>
+`int` > `int`  
+`float` > `float`  
 
 ### Less than
 Checks if a is less than b.
 #### Syntax
-`a < b`<br>
+`a < b`  
 #### Supported types
-`int` < `int`<br>
-`float` < `float`<br>
+`int` < `int`  
+`float` < `float`  
 
 ### Greater than or equal
 Checks if a is greater than or equal to b.
 #### Syntax
-`a >= b`<br>
+`a >= b`  
 #### Supported types
-`int` >= `int`<br>
-`float` >= `float`<br>
+`int` >= `int`  
+`float` >= `float`  
 
 ### Less than or equal
 Checks if a is less than or equal to b.
 #### Syntax
-`a <= b`<br>
+`a <= b`  
 #### Supported types
-`int` <= `int`<br>
-`float` <= `float`<br>
+`int` <= `int`  
+`float` <= `float`  
 
 ### And
 Checks if a and b are both true.
 #### Syntax
-`a && b`<br>
+`a && b`  
 #### Supported types
-`bool` && `bool`<br>
+`bool` && `bool`  
 
 ### Or
 Checks if a or b is true.
 #### Syntax
-`a || b`<br>
+`a || b`  
 #### Supported types
-`bool` || `bool`<br>
+`bool` || `bool`  
 
 ### Not
 Checks if a is false.
 #### Syntax
-`!a`<br>
+`!a`  
 #### Supported types
-`!bool`<br>
+`!bool`  
 
 ## Functions
 Functions are declared with the `fn` keyword.  
 
 ### Syntax
-`fn function_name(arg1: type, arg2: type, ...): return_type { ... }
+`fn function_name(arg1: type, arg2: type, ...): return_type { ... }`  
 
 ### Note
 There is no return keyword.
