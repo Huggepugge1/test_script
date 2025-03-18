@@ -15,7 +15,7 @@ pub enum LexerError<'a> {
     Unknown(&'a PathBuf, std::io::Error),
 }
 
-impl<'a> LexerError<'a> {
+impl LexerError<'_> {
     pub fn print(&self) {
         match &self {
             LexerError::FileNotFound(path) => {
@@ -128,7 +128,7 @@ impl std::fmt::Display for ParseErrorType {
                     f,
                     "Type error: Expected one of {}, found `{}`",
                     expected
-                        .into_iter()
+                        .iter()
                         .map(|r#type| format!("`{type}`"))
                         .collect::<Vec<String>>()
                         .join(", "),
@@ -309,7 +309,7 @@ pub struct ParseWarning<'a> {
     pub token: Token,
 }
 
-impl<'a> std::fmt::Display for ParseWarningType<'a> {
+impl std::fmt::Display for ParseWarningType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
@@ -335,7 +335,7 @@ impl<'a> std::fmt::Display for ParseWarningType<'a> {
     }
 }
 
-impl<'a> ParseWarning<'a> {
+impl ParseWarning<'_> {
     pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
         ParseWarning { r#type, token }
     }

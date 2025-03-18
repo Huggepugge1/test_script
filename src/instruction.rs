@@ -8,10 +8,13 @@ use crate::variable::Variable;
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
     String(String),
-    Regex(Vec<String>),
+    Regex(Vec<InstructionResult>),
     Int(i64),
     Float(f64),
     Bool(bool),
+
+    Vector(Vec<InstructionResult>),
+
     None,
 }
 
@@ -23,13 +26,18 @@ impl std::fmt::Display for InstructionResult {
             InstructionResult::Int(i) => write!(f, "{}", i),
             InstructionResult::Float(i) => write!(f, "{}", i),
             InstructionResult::Bool(b) => write!(f, "{}", b),
+
+            InstructionResult::Vector(v) => write!(f, "{:?}", v),
+
             InstructionResult::None => write!(f, "()"),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOperator {
+    In,
+
     And,
     Or,
 
@@ -53,6 +61,8 @@ impl std::fmt::Display for BinaryOperator {
             f,
             "{}",
             match self {
+                BinaryOperator::In => "in",
+
                 BinaryOperator::And => "&&",
                 BinaryOperator::Or => "||",
 
@@ -76,6 +86,8 @@ impl std::fmt::Display for BinaryOperator {
 impl BinaryOperator {
     pub fn value(&self) -> Self {
         match self {
+            BinaryOperator::In => Self::In,
+
             BinaryOperator::Addition => Self::Addition,
             BinaryOperator::Subtraction => Self::Addition,
             BinaryOperator::Multiplication => Self::Multiplication,
@@ -94,9 +106,15 @@ impl BinaryOperator {
     }
 }
 
+impl std::cmp::PartialOrd for BinaryOperator {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl std::cmp::Ord for BinaryOperator {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value().partial_cmp(&other.value()).unwrap()
+        (self.value() as usize).cmp(&(other.value() as usize))
     }
 }
 
@@ -144,6 +162,7 @@ impl std::fmt::Display for Instruction {
                 InstructionType::IntegerLiteral(ref value) => value.to_string(),
                 InstructionType::FloatLiteral(ref value) => value.to_string(),
                 InstructionType::BooleanLiteral(ref value) => value.to_string(),
+                InstructionType::VectorLiteral(ref vector) => format!("{:?}", vector),
 
                 InstructionType::BuiltIn(ref built_in) => match built_in {
                     BuiltIn::Input(ref instruction) => format!("input({})", instruction),
@@ -219,7 +238,7 @@ impl std::fmt::Display for Instruction {
                             result.push_str(", ");
                         }
                     }
-                    result.push_str(")");
+                    result.push(')');
                     result
                 }
 
@@ -283,10 +302,17 @@ impl Instruction {
     ) -> Result<InstructionResult, InterpreterError> {
         Ok(match &self.r#type {
             InstructionType::StringLiteral(value) => InstructionResult::String(value.to_string()),
-            InstructionType::RegexLiteral(value) => InstructionResult::Regex(value.to_vec()),
+            InstructionType::RegexLiteral(value) => InstructionResult::Regex(
+                value
+                    .iter()
+                    .map(|s| InstructionResult::String(s.clone()))
+                    .collect(),
+            ),
             InstructionType::IntegerLiteral(value) => InstructionResult::Int(*value),
             InstructionType::FloatLiteral(value) => InstructionResult::Float(*value),
             InstructionType::BooleanLiteral(value) => InstructionResult::Bool(*value),
+
+            InstructionType::VectorLiteral(_) => self.interpret_vector(environment, process)?,
 
             InstructionType::BuiltIn(_) => self.interpret_builtin(environment, process)?,
 
@@ -326,6 +352,21 @@ impl Instruction {
                 unreachable!();
             }
         })
+    }
+
+    fn interpret_vector(
+        &self,
+        environment: &mut Environment,
+        process: &mut Option<&mut Process>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let mut vector = Vec::new();
+        if let InstructionType::VectorLiteral(instruction_vector) = &self.r#type {
+            for instruction in instruction_vector {
+                vector.push(instruction.interpret(environment, process)?);
+            }
+        }
+
+        Ok(InstructionResult::Vector(vector))
     }
 
     fn interpret_builtin(
@@ -434,12 +475,9 @@ impl Instruction {
             }
         };
         match assignment_values {
-            InstructionResult::Regex(values) => {
+            InstructionResult::Regex(values) | InstructionResult::Vector(values) => {
                 for value in values {
-                    environment.insert(
-                        assignment_var.name.clone(),
-                        InstructionResult::String(value),
-                    );
+                    environment.insert(assignment_var.name.clone(), value);
                     result = match instruction.interpret(environment, process) {
                         Ok(value) => value,
                         Err(e) => {
@@ -449,9 +487,7 @@ impl Instruction {
                     };
                 }
             }
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
         environment.remove_scope();
         Ok(result)
@@ -550,7 +586,7 @@ impl Instruction {
             _ => unreachable!(),
         };
 
-        let function = environment.get_function(&name).cloned().unwrap();
+        let function = environment.get_function(name).cloned().unwrap();
         let (parameters, instruction) = match &function.r#type {
             InstructionType::Function {
                 parameters,
@@ -621,6 +657,8 @@ impl Instruction {
         };
 
         Ok(match operator {
+            BinaryOperator::In => self.interpret_in(environment, process)?,
+
             BinaryOperator::Addition => self.interpret_addition(environment, process)?,
             BinaryOperator::Subtraction => self.interpret_subtraction(environment, process)?,
             BinaryOperator::Multiplication => {
@@ -645,6 +683,24 @@ impl Instruction {
         })
     }
 
+    fn interpret_in(
+        &self,
+        environment: &mut Environment,
+        process: &mut Option<&mut Process>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        let (left, right) = match &self.r#type {
+            InstructionType::BinaryOperation { left, right, .. } => (
+                left.interpret(environment, process)?,
+                right.interpret(environment, process)?,
+            ),
+            _ => unreachable!(),
+        };
+        Ok(InstructionResult::Bool(match (left, right) {
+            (value, InstructionResult::Vector(vector)) => vector.contains(&value),
+            _ => unreachable!(),
+        }))
+    }
+
     fn interpret_addition(
         &self,
         environment: &mut Environment,
@@ -655,9 +711,7 @@ impl Instruction {
                 left.interpret(environment, process)?,
                 right.interpret(environment, process)?,
             ),
-            _ => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         };
         Ok(match (left, right) {
             (InstructionResult::String(left), InstructionResult::String(right)) => {
@@ -1035,7 +1089,7 @@ impl Instruction {
                         Err(_) => {
                             return Err(InterpreterError::TypeCast {
                                 result: value,
-                                from: *r#type,
+                                from: r#type.clone(),
                                 to: Type::Int,
                             });
                         }
@@ -1053,7 +1107,7 @@ impl Instruction {
                         Err(_) => {
                             return Err(InterpreterError::TypeCast {
                                 result: value,
-                                from: *r#type,
+                                from: r#type.clone(),
                                 to: Type::Float,
                             });
                         }
@@ -1071,7 +1125,7 @@ impl Instruction {
                         Err(_) => {
                             return Err(InterpreterError::TypeCast {
                                 result: value,
-                                from: *r#type,
+                                from: r#type.clone(),
                                 to: Type::Bool,
                             });
                         }
@@ -1095,6 +1149,7 @@ pub enum InstructionType {
     IntegerLiteral(i64),
     FloatLiteral(f64),
     BooleanLiteral(bool),
+    VectorLiteral(Vec<Instruction>),
 
     BuiltIn(BuiltIn),
 

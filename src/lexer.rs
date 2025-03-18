@@ -15,7 +15,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(contents: &'a mut String, args: Args) -> Lexer<'a> {
+    pub fn new(contents: &'a mut str, args: Args) -> Lexer<'a> {
         let lines = contents.lines().map(|s| s.to_string()).collect();
         let contents = contents.chars().peekable().to_owned().clone();
 
@@ -55,7 +55,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn get_line(&self) -> String {
-        self.lines[self.row as usize - 1].clone()
+        self.lines[self.row - 1].clone()
     }
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
@@ -69,14 +69,24 @@ impl<'a> Lexer<'a> {
             "true" | "false" => TokenType::BooleanLiteral {
                 value: value.parse::<bool>().unwrap(),
             },
-            "in" => TokenType::IterableAssignmentOperator,
+            "in" => TokenType::BinaryOperator {
+                value: "in".to_string(),
+            },
             "as" => TokenType::TypeCast,
             "input" | "output" | "print" | "println" => TokenType::BuiltIn {
                 value: value.to_string(),
             },
-            _ => TokenType::Identifier {
-                value: value.to_string(),
-            },
+            v => {
+                if v.starts_with("[") && v.ends_with("]") {
+                    TokenType::Type {
+                        value: Type::Vector(Box::new(Type::from(&v[1..v.len() - 1]))),
+                    }
+                } else {
+                    TokenType::Identifier {
+                        value: value.to_string(),
+                    }
+                }
+            }
         }
     }
 
@@ -195,6 +205,8 @@ impl<'a> Lexer<'a> {
                 '}' => self.tokens.push(self.make_token(TokenType::CloseBlock)),
                 '(' => self.tokens.push(self.make_token(TokenType::OpenParen)),
                 ')' => self.tokens.push(self.make_token(TokenType::CloseParen)),
+                '[' => self.tokens.push(self.make_token(TokenType::OpenBracket)),
+                ']' => self.tokens.push(self.make_token(TokenType::CloseBracket)),
                 ';' => self.tokens.push(self.make_token(TokenType::Semicolon)),
                 ',' => self.tokens.push(self.make_token(TokenType::Comma)),
                 '+' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
@@ -209,7 +221,7 @@ impl<'a> Lexer<'a> {
                 '/' => {
                     self.contents.next();
                     if let Some('/') = self.contents.peek() {
-                        while let Some(next) = self.contents.next() {
+                        for next in self.contents.by_ref() {
                             if next == '\n' {
                                 break;
                             }
@@ -272,8 +284,9 @@ impl<'a> Lexer<'a> {
                         length += 1;
                         self.contents.next();
                     } else {
-                        self.tokens
-                            .push(self.make_token(TokenType::AssignmentOperator));
+                        self.tokens.push(self.make_token(TokenType::BinaryOperator {
+                            value: "=".to_string(),
+                        }));
                     }
                     self.column += length;
                     continue;
