@@ -32,7 +32,7 @@ fn split_command(command: &str) -> Vec<String> {
                 }
             }
             _ => {
-                current_arg.push(c); // Part of the current argument
+                current_arg.push(c);
             }
         }
     }

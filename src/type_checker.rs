@@ -616,9 +616,17 @@ impl TypeChecker {
             (Type::String, Type::Int) => Ok(Type::Int),
             (Type::Int, Type::String) => Ok(Type::String),
 
+            (Type::Int, Type::Float) => Ok(Type::Float),
+            (Type::Float, Type::Int) => Ok(Type::Int),
+
+            (Type::String, Type::Float) => Ok(Type::Float),
+            (Type::Float, Type::String) => Ok(Type::String),
+
             (Type::String, Type::Bool) => Ok(Type::Bool),
             (Type::Bool, Type::String) => Ok(Type::String),
+
             (Type::String, Type::Regex) => Ok(Type::Regex),
+
             _ => Err(ParseError::new(
                 ParseErrorType::TypeCast {
                     from: instruction_type,

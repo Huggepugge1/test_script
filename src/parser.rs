@@ -380,18 +380,6 @@ impl Parser {
         match &token.r#type {
             TokenType::StringLiteral { value } => {
                 let value = value[1..value.len() - 1].to_string();
-                if !self.args.disable_magic_warnings
-                    && !self.in_constant_declaration
-                    && !white_listed_constants::STRINGS.contains(&value.as_str())
-                {
-                    if !self.args.disable_style_warnings {
-                        ParseWarning::new(
-                            ParseWarningType::MagicLiteral(Type::String),
-                            token.clone(),
-                        )
-                        .print(self.args.disable_warnings)
-                    }
-                }
 
                 Ok(Instruction::new(
                     InstructionType::StringLiteral(value),
@@ -534,24 +522,10 @@ impl Parser {
     fn parse_regex_literal(&mut self) -> Result<Instruction, ParseError> {
         let token = self.get_next_token()?;
         match &token.r#type {
-            TokenType::RegexLiteral { value } => {
-                if !self.args.disable_magic_warnings
-                    && !self.in_constant_declaration
-                    && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
-                {
-                    if !self.args.disable_style_warnings {
-                        ParseWarning::new(
-                            ParseWarningType::MagicLiteral(Type::Regex),
-                            token.clone(),
-                        )
-                        .print(self.args.disable_warnings)
-                    }
-                }
-                Ok(Instruction::new(
-                    InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
-                    token,
-                ))
-            }
+            TokenType::RegexLiteral { .. } => Ok(Instruction::new(
+                InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
+                token,
+            )),
             _ => unreachable!(),
         }
     }
