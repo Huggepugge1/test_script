@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 #[derive(Debug)]
 pub struct ParseEnvironment {
     pub variables: Vec<IndexMap<String, Variable>>,
-    pub functions: IndexMap<String, Box<Instruction>>,
+    pub functions: IndexMap<String, Instruction>,
     pub args: Args,
 }
 
@@ -83,7 +83,7 @@ impl ParseEnvironment {
         }
     }
 
-    pub fn add_function(&mut self, function: Box<Instruction>) {
+    pub fn add_function(&mut self, function: Instruction) {
         match &function.r#type {
             InstructionType::Function { name, .. } => {
                 self.functions.insert(name.to_string(), function);
@@ -92,7 +92,7 @@ impl ParseEnvironment {
         }
     }
 
-    pub fn get_function(&self, name: &str) -> Option<&Box<Instruction>> {
+    pub fn get_function(&self, name: &str) -> Option<&Instruction> {
         self.functions.get(name)
     }
 }

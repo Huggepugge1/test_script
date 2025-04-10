@@ -15,7 +15,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(contents: &'a mut String, args: Args) -> Lexer<'a> {
+    pub fn new(contents: &'a mut str, args: Args) -> Lexer<'a> {
         let lines = contents.lines().map(|s| s.to_string()).collect();
         let contents = contents.chars().peekable().to_owned().clone();
 
@@ -55,7 +55,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn get_line(&self) -> String {
-        self.lines[self.row as usize - 1].clone()
+        self.lines[self.row - 1].clone()
     }
 
     fn identifier_type(&mut self, value: &String) -> TokenType {
@@ -197,6 +197,7 @@ impl<'a> Lexer<'a> {
                 ')' => self.tokens.push(self.make_token(TokenType::CloseParen)),
                 ';' => self.tokens.push(self.make_token(TokenType::Semicolon)),
                 ',' => self.tokens.push(self.make_token(TokenType::Comma)),
+                '.' => self.tokens.push(self.make_token(TokenType::Dot)),
                 '+' => self.tokens.push(self.make_token(TokenType::BinaryOperator {
                     value: "+".to_string(),
                 })),
@@ -209,7 +210,7 @@ impl<'a> Lexer<'a> {
                 '/' => {
                     self.contents.next();
                     if let Some('/') = self.contents.peek() {
-                        while let Some(next) = self.contents.next() {
+                        for next in self.contents.by_ref() {
                             if next == '\n' {
                                 break;
                             }
@@ -352,7 +353,14 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 ' ' | '\t' => (),
-                _ => panic!("Unexpected character: \"{}\"", c),
+                v => {
+                    let token_as_string = v.to_string();
+                    let token = self.make_token(TokenType::Error {
+                        value: token_as_string,
+                    });
+                    self.tokens.push(token);
+                    continue;
+                }
             }
             self.column += 1;
             self.contents.next();

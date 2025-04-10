@@ -91,8 +91,8 @@ impl TypeChecker {
                 instruction,
             } => {
                 self.environment.add_scope();
-                self.check_instruction(&assignment)?;
-                let result = self.check_instruction(&instruction)?;
+                self.check_instruction(assignment)?;
+                let result = self.check_instruction(instruction)?;
                 self.environment.remove_scope();
                 Ok(result)
             }
@@ -117,18 +117,18 @@ impl TypeChecker {
                 instruction,
                 token,
                 declaration,
-            } => self.check_assignment(&variable, &instruction, token, declaration),
+            } => self.check_assignment(variable, instruction, token, declaration),
 
             InstructionType::IterableAssignment {
                 variable,
                 instruction,
                 token,
-            } => self.check_iterable_assignment(&variable, &instruction, token),
+            } => self.check_iterable_assignment(variable, instruction, token),
 
             InstructionType::UnaryOperation {
                 operator,
                 instruction,
-            } => self.check_unary(operator, &instruction),
+            } => self.check_unary(operator, instruction),
             InstructionType::BinaryOperation {
                 operator,
                 left,
@@ -157,7 +157,7 @@ impl TypeChecker {
     fn check_builtin(&mut self, built_in: &BuiltIn) -> Result<Type, ParseError> {
         match built_in {
             BuiltIn::Input(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
+                let r#type = self.check_instruction(instruction)?;
                 if r#type == Type::String {
                     Ok(Type::None)
                 } else {
@@ -171,7 +171,7 @@ impl TypeChecker {
                 }
             }
             BuiltIn::Output(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
+                let r#type = self.check_instruction(instruction)?;
                 if r#type == Type::String {
                     Ok(Type::None)
                 } else {
@@ -185,7 +185,7 @@ impl TypeChecker {
                 }
             }
             BuiltIn::Print(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
+                let r#type = self.check_instruction(instruction)?;
                 if r#type == Type::String {
                     Ok(Type::None)
                 } else {
@@ -199,7 +199,7 @@ impl TypeChecker {
                 }
             }
             BuiltIn::Println(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
+                let r#type = self.check_instruction(instruction)?;
                 if r#type == Type::String {
                     Ok(Type::None)
                 } else {
@@ -215,13 +215,13 @@ impl TypeChecker {
         }
     }
 
-    fn check_block(&mut self, instructions: &Vec<Instruction>) -> Result<Type, ParseError> {
+    fn check_block(&mut self, instructions: &[Instruction]) -> Result<Type, ParseError> {
         self.environment.add_scope();
-        if (instructions.len()) == 0 {
+        if instructions.is_empty() {
             return Ok(Type::None);
         }
         for instruction in &instructions[..instructions.len() - 1] {
-            match self.check_instruction(&instruction) {
+            match self.check_instruction(instruction) {
                 Ok(t) => match t {
                     Type::None => (),
                     _ => {
@@ -252,7 +252,7 @@ impl TypeChecker {
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
 
-        let instruction_type = self.check_instruction(&instruction)?;
+        let instruction_type = self.check_instruction(instruction)?;
 
         if variable_type != Type::Any && variable_type != instruction_type {
             return Err(ParseError::new(
@@ -271,11 +271,7 @@ impl TypeChecker {
         variable.read = false;
         variable.last_assignment_token = token.clone();
 
-        if !declaration {
-            variable.assigned = true;
-        } else {
-            variable.assigned = false;
-        }
+        variable.assigned = !declaration;
 
         self.environment.insert(variable);
         Ok(Type::None)
@@ -288,15 +284,12 @@ impl TypeChecker {
         token: &Token,
     ) -> Result<Type, ParseError> {
         let variable_type = variable.r#type;
-        match self.check_instruction(&instruction) {
+        match self.check_instruction(instruction) {
             Ok(Type::Regex) => match variable_type {
                 Type::String => {
                     self.environment.insert(variable.clone());
-                    match self.environment.get(&variable.name) {
-                        Some(v) => {
-                            v.assigned = true;
-                        }
-                        None => (),
+                    if let Some(v) = self.environment.get(&variable.name) {
+                        v.assigned = true;
                     }
                     Ok(variable_type)
                 }
@@ -646,7 +639,7 @@ impl TypeChecker {
             } => (parameters, instruction),
             _ => unreachable!(),
         };
-        self.environment.add_function(Box::new(instruction.clone()));
+        self.environment.add_function(instruction.clone());
 
         self.environment.add_scope();
         for parameter in parameters {
@@ -660,7 +653,7 @@ impl TypeChecker {
     fn check_function_call(
         &mut self,
         name: &str,
-        arguments: &Vec<Instruction>,
+        arguments: &[Instruction],
     ) -> Result<Type, ParseError> {
         match &self.environment.functions.get(name).cloned() {
             Some(instruction) => {
@@ -707,7 +700,7 @@ impl TypeChecker {
         instruction: &Instruction,
         r#else: &Instruction,
     ) -> Result<Type, ParseError> {
-        let condition_type = self.check_instruction(&condition)?;
+        let condition_type = self.check_instruction(condition)?;
         if condition_type != Type::Bool {
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType {
@@ -717,9 +710,9 @@ impl TypeChecker {
                 condition.token.clone(),
             ));
         }
-        let result = self.check_instruction(&instruction)?;
+        let result = self.check_instruction(instruction)?;
         let result_else = if *r#else != Instruction::NONE {
-            self.check_instruction(&r#else)?
+            self.check_instruction(r#else)?
         } else {
             Type::None
         };

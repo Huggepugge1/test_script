@@ -18,13 +18,13 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: TokenCollection, args: Args) -> Self {
-        return Self {
+        Self {
             tokens,
             environment: ParseEnvironment::new(args.clone()),
             args,
             in_constant_declaration: false,
             success: true,
-        };
+        }
     }
 
     pub fn parse(&mut self) -> Result<Vec<Instruction>, Vec<Instruction>> {
@@ -167,7 +167,7 @@ impl Parser {
         let instruction = self.parse_statement()?;
 
         Ok(Instruction::new(
-            InstructionType::Test(Box::new(instruction), name.to_string(), path.into()),
+            InstructionType::Test(Box::new(instruction), name.to_string(), path),
             token,
         ))
     }
@@ -192,11 +192,11 @@ impl Parser {
         let parameters = self.parse_parameters()?;
         self.expect_token(TokenType::CloseParen)?;
         self.expect_token(TokenType::Colon)?;
-        let return_type = match &self.get_next_token()? {
+        let return_type = match self.get_next_token()? {
             Token {
                 r#type: TokenType::Type { value },
                 ..
-            } => value.clone(),
+            } => value,
             return_type => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -217,7 +217,7 @@ impl Parser {
             },
             token.clone(),
         );
-        self.environment.add_function(Box::new(function.clone()));
+        self.environment.add_function(function.clone());
         self.environment.add_scope();
         for parameter in parameters.iter() {
             self.environment.insert(parameter.clone());
@@ -233,7 +233,7 @@ impl Parser {
             },
             token.clone(),
         );
-        self.environment.add_function(Box::new(function.clone()));
+        self.environment.add_function(function.clone());
         Ok(function)
     }
 
@@ -311,11 +311,11 @@ impl Parser {
 
         self.expect_token(TokenType::Colon)?;
 
-        let r#type = match &self.get_next_token()? {
+        let r#type = match self.get_next_token()? {
             Token {
                 r#type: TokenType::Type { value },
                 ..
-            } => value.clone(),
+            } => value,
             r#type => {
                 self.tokens.advance_to_next_instruction();
                 return Err(ParseError::new(
@@ -441,17 +441,15 @@ impl Parser {
         };
 
         let new_right = self.parse_expression(false, true)?;
-        match new_right {
-            Instruction {
-                r#type: InstructionType::None,
-                ..
-            } => {
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken(TokenType::Semicolon),
-                    token.clone(),
-                ))
-            }
-            _ => (),
+        if let Instruction {
+            r#type: InstructionType::None,
+            ..
+        } = new_right
+        {
+            return Err(ParseError::new(
+                ParseErrorType::UnexpectedToken(TokenType::Semicolon),
+                token.clone(),
+            ));
         }
         match instruction.r#type {
             InstructionType::BinaryOperation {
@@ -459,7 +457,7 @@ impl Parser {
                 ref left,
                 ref right,
             } => Ok(Instruction::new(
-                if new_operator.cmp(&operator) != std::cmp::Ordering::Greater {
+                if new_operator > *operator {
                     InstructionType::BinaryOperation {
                         operator: new_operator,
                         left: Box::new(instruction.clone()),
@@ -537,11 +535,10 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::INTEGERS.contains(&value)
+                    && !self.args.disable_style_warnings
                 {
-                    if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
-                            .print(self.args.disable_warnings)
-                    }
+                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
+                        .print(self.args.disable_warnings)
                 }
                 Ok(Instruction::new(
                     InstructionType::IntegerLiteral(value),
@@ -559,14 +556,10 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::FLOATS.contains(&value)
+                    && !self.args.disable_style_warnings
                 {
-                    if !self.args.disable_style_warnings {
-                        ParseWarning::new(
-                            ParseWarningType::MagicLiteral(Type::Float),
-                            token.clone(),
-                        )
+                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Float), token.clone())
                         .print(self.args.disable_warnings)
-                    }
                 }
                 Ok(Instruction::new(
                     InstructionType::FloatLiteral(value),
@@ -584,11 +577,10 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::BOOLS.contains(&value)
+                    && !self.args.disable_style_warnings
                 {
-                    if !self.args.disable_style_warnings {
-                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
-                            .print(self.args.disable_warnings)
-                    }
+                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
+                        .print(self.args.disable_warnings)
                 }
                 Ok(Instruction::new(
                     InstructionType::BooleanLiteral(value),
@@ -650,7 +642,6 @@ impl Parser {
                         }
                     }
                 }
-                if r#const && !value.is_snake_case() {}
                 value.clone()
             }
             _ => {
@@ -692,11 +683,11 @@ impl Parser {
             }
         }
 
-        let r#type = match &self.get_next_token()? {
+        let r#type = match self.get_next_token()? {
             Token {
                 r#type: TokenType::Type { value },
                 ..
-            } => value.clone(),
+            } => value,
 
             r#type => {
                 self.tokens.advance_to_next_instruction();
@@ -730,7 +721,7 @@ impl Parser {
         let variable = Variable {
             name: identifier_name.clone(),
             r#const,
-            r#type: r#type.clone(),
+            r#type,
             declaration_token: token.clone(),
             identifier_token: identifier.clone(),
             last_assignment_token: assignment.clone(),
@@ -816,14 +807,11 @@ impl Parser {
             ));
         }
 
-        match instruction.r#type {
-            InstructionType::Variable(ref instruction_variable) => {
-                if variable.name == instruction_variable.name {
-                    ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
-                        .print(self.args.disable_warnings);
-                }
+        if let InstructionType::Variable(ref instruction_variable) = instruction.r#type {
+            if variable.name == instruction_variable.name {
+                ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
+                    .print(self.args.disable_warnings);
             }
-            _ => (),
         }
 
         Ok(Instruction::new(
@@ -862,7 +850,7 @@ impl Parser {
                     ))
                 } else {
                     Ok(Instruction::new(
-                        InstructionType::Variable(self.environment.get(&value).unwrap().clone()),
+                        InstructionType::Variable(self.environment.get(value).unwrap().clone()),
                         token,
                     ))
                 }

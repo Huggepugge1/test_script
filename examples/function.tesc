@@ -8,6 +8,6 @@ fn fib(n: int): int {
 
 test("./my_app") {
     const N: int = 10;
-    input(N);
+    input(N as string);
     output(fib(N) as string);
 }

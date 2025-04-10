@@ -28,7 +28,7 @@ impl std::fmt::Display for InstructionResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOperator {
     And,
     Or,
@@ -94,9 +94,9 @@ impl BinaryOperator {
     }
 }
 
-impl std::cmp::Ord for BinaryOperator {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value().partial_cmp(&other.value()).unwrap()
+impl std::cmp::PartialOrd for BinaryOperator {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some((self.value() as u64).cmp(&(other.value() as u64)))
     }
 }
 
@@ -219,7 +219,7 @@ impl std::fmt::Display for Instruction {
                             result.push_str(", ");
                         }
                     }
-                    result.push_str(")");
+                    result.push(')');
                     result
                 }
 
@@ -550,7 +550,7 @@ impl Instruction {
             _ => unreachable!(),
         };
 
-        let function = environment.get_function(&name).cloned().unwrap();
+        let function = environment.get_function(name).cloned().unwrap();
         let (parameters, instruction) = match &function.r#type {
             InstructionType::Function {
                 parameters,
