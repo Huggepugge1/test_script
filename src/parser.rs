@@ -141,6 +141,7 @@ impl Parser {
                     false => break,
                 },
                 TokenType::AssignmentOperator => self.parse_assignment(&instruction)?,
+                TokenType::Dot => self.parse_method_call(&instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -895,6 +896,28 @@ impl Parser {
             },
             _ => unreachable!(),
         }
+    }
+
+    fn parse_method_call(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
+        let token_of_dot = self.get_next_token()?;
+        let identifier = self.parse_identifier()?;
+        let name;
+        if let Instruction {
+            r#type: InstructionType::Identifier { value },
+            ..
+        } = identifier
+        {
+            name = value;
+        }
+        let arguments = self.parse_arguments()?;
+        Ok(Instruction {
+            r#type: InstructionType::MethodCall {
+                object: Box::new(instruction.clone()),
+                name: name,
+                arguments,
+            },
+            token: token_of_dot,
+        })
     }
 
     fn parse_block(&mut self) -> Result<Instruction, ParseError> {

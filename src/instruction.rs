@@ -1135,6 +1135,11 @@ pub enum InstructionType {
         name: String,
         arguments: Vec<Instruction>,
     },
+    MethodCall {
+        object: Box<Instruction>,
+        name: String,
+        arguments: Vec<Instruction>,
+    },
 
     UnaryOperation {
         operator: UnaryOperator,

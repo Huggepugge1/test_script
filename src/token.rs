@@ -119,7 +119,10 @@ impl Token {
     pub fn binary_operator(&self) -> bool {
         matches!(
             &self.r#type,
-            TokenType::BinaryOperator { .. } | TokenType::AssignmentOperator | TokenType::TypeCast
+            TokenType::BinaryOperator { .. }
+                | TokenType::AssignmentOperator
+                | TokenType::TypeCast
+                | TokenType::Dot
         )
     }
 

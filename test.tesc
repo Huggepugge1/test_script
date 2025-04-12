@@ -1,3 +1,5 @@
 test1("ls") {
-    println("Hello, World!".len());
+    const NAME: none = {} + {}
+    const NAME_2: none = {}
+    print("Hello, world!\n");
 }
