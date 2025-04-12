@@ -92,8 +92,8 @@ impl ParseEnvironment {
         }
     }
 
-    pub fn get_function(&self, name: &str) -> Option<&Instruction> {
-        self.functions.get(name).map(|function| &**function)
+    pub fn get_function(&self, name: &str) -> Option<&Box<Instruction>> {
+        self.functions.get(name)
     }
 }
 

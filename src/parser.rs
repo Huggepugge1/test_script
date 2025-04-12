@@ -18,13 +18,13 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: TokenCollection, args: Args) -> Self {
-        Self {
+        return Self {
             tokens,
             environment: ParseEnvironment::new(args.clone()),
             args,
             in_constant_declaration: false,
             success: true,
-        }
+        };
     }
 
     pub fn parse(&mut self) -> Result<Vec<Instruction>, Vec<Instruction>> {
@@ -106,7 +106,6 @@ impl Parser {
 
             TokenType::OpenBlock => self.parse_block()?,
             TokenType::OpenParen => self.parse_parentheses()?,
-            TokenType::OpenBracket => self.parse_vector()?,
 
             TokenType::UnaryOperator { .. } => self.parse_unary_operator()?,
             TokenType::BinaryOperator { value } => match value.as_str() {
@@ -141,6 +140,7 @@ impl Parser {
                     true => self.parse_type_cast(&instruction)?,
                     false => break,
                 },
+                TokenType::AssignmentOperator => self.parse_assignment(&instruction)?,
                 _ => unreachable!(),
             };
             token = self.peek_next_token()?;
@@ -167,7 +167,7 @@ impl Parser {
         let instruction = self.parse_statement()?;
 
         Ok(Instruction::new(
-            InstructionType::Test(Box::new(instruction), name.to_string(), path),
+            InstructionType::Test(Box::new(instruction), name.to_string(), path.into()),
             token,
         ))
     }
@@ -213,7 +213,7 @@ impl Parser {
                 name: name.to_string(),
                 parameters: parameters.clone(),
                 instruction: Box::new(Instruction::NONE),
-                return_type: return_type.clone(),
+                return_type,
             },
             token.clone(),
         );
@@ -383,10 +383,14 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::STRINGS.contains(&value.as_str())
-                    && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::String), token.clone())
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::String),
+                            token.clone(),
+                        )
                         .print(self.args.disable_warnings)
+                    }
                 }
 
                 Ok(Instruction::new(
@@ -443,26 +447,23 @@ impl Parser {
                 "<=" => BinaryOperator::LessThanOrEqual,
                 "&&" => BinaryOperator::And,
                 "||" => BinaryOperator::Or,
-                "in" => BinaryOperator::In,
-                "=" => {
-                    self.tokens.back();
-                    return self.parse_assignment(&instruction);
-                }
                 _ => unreachable!(),
             },
             _ => unreachable!(),
         };
 
         let new_right = self.parse_expression(false, true)?;
-        if let Instruction {
-            r#type: InstructionType::None,
-            ..
-        } = new_right
-        {
-            return Err(ParseError::new(
-                ParseErrorType::UnexpectedToken(TokenType::Semicolon),
-                token.clone(),
-            ));
+        match new_right {
+            Instruction {
+                r#type: InstructionType::None,
+                ..
+            } => {
+                return Err(ParseError::new(
+                    ParseErrorType::UnexpectedToken(TokenType::Semicolon),
+                    token.clone(),
+                ))
+            }
+            _ => (),
         }
         match instruction.r#type {
             InstructionType::BinaryOperation {
@@ -470,7 +471,7 @@ impl Parser {
                 ref left,
                 ref right,
             } => Ok(Instruction::new(
-                if new_operator.cmp(operator) != std::cmp::Ordering::Greater {
+                if new_operator.cmp(&operator) != std::cmp::Ordering::Greater {
                     InstructionType::BinaryOperation {
                         operator: new_operator,
                         left: Box::new(instruction.clone()),
@@ -537,10 +538,14 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::STRINGS.contains(&value.to_string().as_str())
-                    && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Regex), token.clone())
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::Regex),
+                            token.clone(),
+                        )
                         .print(self.args.disable_warnings)
+                    }
                 }
                 Ok(Instruction::new(
                     InstructionType::RegexLiteral(regex::parse(&token, self.args.max_size)?),
@@ -558,10 +563,11 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::INTEGERS.contains(&value)
-                    && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
-                        .print(self.args.disable_warnings)
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
+                            .print(self.args.disable_warnings)
+                    }
                 }
                 Ok(Instruction::new(
                     InstructionType::IntegerLiteral(value),
@@ -579,10 +585,14 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::FLOATS.contains(&value)
-                    && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Float), token.clone())
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(
+                            ParseWarningType::MagicLiteral(Type::Float),
+                            token.clone(),
+                        )
                         .print(self.args.disable_warnings)
+                    }
                 }
                 Ok(Instruction::new(
                     InstructionType::FloatLiteral(value),
@@ -600,10 +610,11 @@ impl Parser {
                 if !self.args.disable_magic_warnings
                     && !self.in_constant_declaration
                     && !white_listed_constants::BOOLS.contains(&value)
-                    && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
-                        .print(self.args.disable_warnings)
+                    if !self.args.disable_style_warnings {
+                        ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
+                            .print(self.args.disable_warnings)
+                    }
                 }
                 Ok(Instruction::new(
                     InstructionType::BooleanLiteral(value),
@@ -665,6 +676,7 @@ impl Parser {
                         }
                     }
                 }
+                if r#const && !value.is_snake_case() {}
                 value.clone()
             }
             _ => {
@@ -711,29 +723,6 @@ impl Parser {
                 r#type: TokenType::Type { value },
                 ..
             } => value.clone(),
-            Token {
-                r#type: TokenType::OpenBracket,
-                ..
-            } => {
-                if let Token {
-                    r#type: TokenType::Type { value },
-                    ..
-                } = self.get_next_token()?
-                {
-                    self.expect_token(TokenType::CloseBracket)?;
-                    Type::from(&format!("[{}]", value))
-                } else {
-                    self.tokens.advance_to_next_instruction();
-                    self.in_constant_declaration = false;
-                    return Err(ParseError::new(
-                        ParseErrorType::MismatchedTokenType {
-                            expected: TokenType::Type { value: Type::Any },
-                            actual: self.get_next_token()?.r#type.clone(),
-                        },
-                        self.get_next_token()?,
-                    ));
-                }
-            }
 
             r#type => {
                 self.tokens.advance_to_next_instruction();
@@ -750,29 +739,13 @@ impl Parser {
 
         let assignment = self.get_next_token()?;
         match &assignment.r#type {
-            TokenType::BinaryOperator { value } => {
-                if value != "=" && value != "in" {
-                    self.tokens.advance_to_next_instruction();
-                    self.in_constant_declaration = false;
-                    return Err(ParseError::new(
-                        ParseErrorType::MismatchedTokenType {
-                            expected: TokenType::BinaryOperator {
-                                value: "=".to_string(),
-                            },
-                            actual: assignment.r#type.clone(),
-                        },
-                        assignment,
-                    ));
-                }
-            }
+            TokenType::AssignmentOperator | TokenType::IterableAssignmentOperator => (),
             _ => {
                 self.tokens.advance_to_next_instruction();
                 self.in_constant_declaration = false;
                 return Err(ParseError::new(
                     ParseErrorType::MismatchedTokenType {
-                        expected: TokenType::BinaryOperator {
-                            value: "=".to_string(),
-                        },
+                        expected: TokenType::AssignmentOperator,
                         actual: assignment.r#type.clone(),
                     },
                     assignment,
@@ -800,35 +773,31 @@ impl Parser {
             }
         };
         self.in_constant_declaration = false;
-        if let TokenType::BinaryOperator { value } = assignment.r#type {
-            match value.as_str() {
-                "=" => {
-                    self.environment.insert(variable.clone());
-                    Ok(Instruction::new(
-                        InstructionType::Assignment {
-                            variable,
-                            instruction: Box::new(instruction),
-                            token: identifier,
-                            declaration: true,
-                        },
-                        token,
-                    ))
-                }
-                "in" => {
-                    self.environment.insert(variable.clone());
-                    Ok(Instruction::new(
-                        InstructionType::IterableAssignment {
-                            variable,
-                            instruction: Box::new(instruction),
-                            token: token.clone(),
-                        },
-                        token,
-                    ))
-                }
-                _ => unreachable!(),
+        match &assignment.r#type {
+            TokenType::AssignmentOperator => {
+                self.environment.insert(variable.clone());
+                Ok(Instruction::new(
+                    InstructionType::Assignment {
+                        variable,
+                        instruction: Box::new(instruction),
+                        token: identifier,
+                        declaration: true,
+                    },
+                    token,
+                ))
             }
-        } else {
-            unreachable!()
+            TokenType::IterableAssignmentOperator => {
+                self.environment.insert(variable.clone());
+                Ok(Instruction::new(
+                    InstructionType::IterableAssignment {
+                        variable,
+                        instruction: Box::new(instruction),
+                        token: token.clone(),
+                    },
+                    token,
+                ))
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -853,17 +822,11 @@ impl Parser {
             ));
         }
 
-        if token.r#type
-            != (TokenType::BinaryOperator {
-                value: "=".to_string(),
-            })
-        {
+        if token.r#type != TokenType::AssignmentOperator {
             self.tokens.advance_to_next_instruction();
             return Err(ParseError::new(
                 ParseErrorType::MismatchedTokenType {
-                    expected: TokenType::BinaryOperator {
-                        value: "=".to_string(),
-                    },
+                    expected: TokenType::AssignmentOperator,
                     actual: token.clone().r#type,
                 },
                 token,
@@ -879,11 +842,14 @@ impl Parser {
             ));
         }
 
-        if let InstructionType::Variable(ref instruction_variable) = instruction.r#type {
-            if variable.name == instruction_variable.name {
-                ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
-                    .print(self.args.disable_warnings);
+        match instruction.r#type {
+            InstructionType::Variable(ref instruction_variable) => {
+                if variable.name == instruction_variable.name {
+                    ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
+                        .print(self.args.disable_warnings);
+                }
             }
+            _ => (),
         }
 
         Ok(Instruction::new(
@@ -922,7 +888,7 @@ impl Parser {
                     ))
                 } else {
                     Ok(Instruction::new(
-                        InstructionType::Variable(self.environment.get(value).unwrap().clone()),
+                        InstructionType::Variable(self.environment.get(&value).unwrap().clone()),
                         token,
                     ))
                 }
@@ -1114,46 +1080,6 @@ impl Parser {
         self.expect_token(TokenType::CloseParen)?;
         Ok(Instruction::new(
             InstructionType::Paren(Box::new(instruction)),
-            token,
-        ))
-    }
-
-    fn parse_vector(&mut self) -> Result<Instruction, ParseError> {
-        let token = self.get_next_token()?;
-        let mut vector = Vec::new();
-        while !self.tokens.is_empty() {
-            match self.parse_expression(true, true) {
-                Ok(instruction) => vector.push(instruction),
-                Err(e) => {
-                    e.print();
-                    self.success = false;
-                }
-            }
-            if let Ok(token) = self.get_next_token() {
-                if token.r#type == TokenType::Comma {
-                    continue;
-                } else if token.r#type == TokenType::CloseBracket {
-                    break;
-                } else {
-                    self.tokens.advance_to_next_instruction();
-                    return Err(ParseError::new(
-                        ParseErrorType::MismatchedTokenType {
-                            expected: TokenType::Comma,
-                            actual: token.r#type.clone(),
-                        },
-                        token.clone(),
-                    ));
-                }
-            } else {
-                self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedEndOfFile,
-                    self.tokens.current().unwrap(),
-                ));
-            }
-        }
-        Ok(Instruction::new(
-            InstructionType::VectorLiteral(vector),
             token,
         ))
     }

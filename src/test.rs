@@ -27,9 +27,11 @@ pub fn run(args: cli::Args) {
         Err(program) => type_checker::TypeChecker::new(program.clone(), args.clone()).check(),
     };
 
-    if let Ok(program) = program {
-        if type_check.is_ok() {
-            interpreter::Interpreter::new(program, args).interpret();
-        }
+    match program {
+        Ok(program) => match type_check {
+            Ok(_) => interpreter::Interpreter::new(program, args).interpret(),
+            Err(_) => (),
+        },
+        Err(_) => (),
     }
 }

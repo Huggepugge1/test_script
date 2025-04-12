@@ -1,14 +1,10 @@
 const QUIT: string = "q";
 
-test("test-script --help") {
-    const VEC: [string] = ["a", "b", "c"];
-    for s: string in VEC {
-        println(s);
+test1("java Main.java") {
+    let inp: string = "";
+    for i: string in `\d` {
+        inp = inp + i + "\n";
     }
-    if "a" in VEC {
-        println("a is in vec");
-    }
-    if !("d" in VEC) {
-        println("d is not in vec");
-    }
+    input(inp + QUIT);
+    output(inp + QUIT);
 }

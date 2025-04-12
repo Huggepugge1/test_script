@@ -29,10 +29,9 @@ pub enum TokenType {
     OpenParen,
     CloseParen,
 
-    OpenBracket,
-    CloseBracket,
-
     TypeCast,
+    AssignmentOperator,
+    IterableAssignmentOperator,
 
     UnaryOperator { value: String },
     BinaryOperator { value: String },
@@ -60,7 +59,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Colon => write!(f, ":"),
 
             TokenType::Identifier { value } => {
-                if !value.is_empty() {
+                if value.len() > 0 {
                     write!(f, "identifier `{value}`")
                 } else {
                     write!(f, "identifier")
@@ -71,10 +70,11 @@ impl std::fmt::Display for TokenType {
             TokenType::CloseBlock => write!(f, "}}"),
             TokenType::OpenParen => write!(f, "("),
             TokenType::CloseParen => write!(f, ")"),
-            TokenType::OpenBracket => write!(f, "["),
-            TokenType::CloseBracket => write!(f, "]"),
 
             TokenType::TypeCast => write!(f, "Keyword `as`"),
+            TokenType::AssignmentOperator => write!(f, "="),
+            TokenType::IterableAssignmentOperator => write!(f, "keyword `in`"),
+
             TokenType::UnaryOperator { value } => write!(f, "unary operator `{value}`"),
             TokenType::BinaryOperator { value } => write!(f, "binary operator `{value}`"),
 
@@ -111,10 +111,12 @@ impl Token {
     }
 
     pub fn binary_operator(&self) -> bool {
-        matches!(
-            &self.r#type,
-            TokenType::BinaryOperator { .. } | TokenType::TypeCast
-        )
+        match &self.r#type {
+            TokenType::BinaryOperator { .. }
+            | TokenType::AssignmentOperator
+            | TokenType::TypeCast => true,
+            _ => false,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -139,10 +141,9 @@ impl Token {
             TokenType::OpenParen => 1,
             TokenType::CloseParen => 1,
 
-            TokenType::OpenBracket => 1,
-            TokenType::CloseBracket => 1,
-
             TokenType::TypeCast => 2,
+            TokenType::AssignmentOperator => 1,
+            TokenType::IterableAssignmentOperator => 2,
 
             TokenType::UnaryOperator { value } => value.len(),
             TokenType::BinaryOperator { value } => value.len(),
@@ -157,8 +158,11 @@ impl Token {
     const LINE_NUMBER_PADDING: usize = 4;
 
     pub fn as_string(&self, style: PrintStyle) -> String {
-        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
-        let padding = &" ".repeat(padding_length + self.column - 1);
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
+        let padding = &" ".repeat(padding_length + self.column as usize - 1);
         format!(
             "{:<4}{}      \n\
              {}{}",
@@ -179,8 +183,11 @@ impl Token {
     }
 
     pub fn insert_tokens(&self, tokens: Vec<TokenType>, message: &str) -> String {
-        let token_len = self.column + self.len() - 1;
-        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
+        let token_len = self.column as usize + self.len() - 1;
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
         let padding = &" ".repeat(padding_length + token_len);
 
         let mut token_string = tokens
@@ -211,8 +218,11 @@ impl Token {
     }
 
     pub fn wrap_in_block(&self, close_token: &Token) -> String {
-        let token_len = self.column + self.len();
-        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
+        let token_len = self.column as usize + self.len();
+        let padding_length = usize::max(
+            Self::LINE_NUMBER_PADDING,
+            self.row.to_string().len() as usize,
+        );
         let line_padding = " ".repeat(self.line.chars().take_while(|c| c.is_whitespace()).count());
 
         let start_line = if token_len > self.line.len() {
@@ -225,7 +235,9 @@ impl Token {
         let content_line = line_padding.clone()
             + "    "
             + &(if self.row == close_token.row {
-                self.line[token_len..close_token.column].trim().to_string()
+                self.line[token_len..close_token.column as usize]
+                    .trim()
+                    .to_string()
             } else {
                 close_token.line.to_string()
             });
@@ -233,7 +245,7 @@ impl Token {
         let end_block_line = line_padding.clone() + "}";
         let end_block_padding = line_padding.clone() + &" ".repeat(padding_length);
 
-        let close_token_len = close_token.column + close_token.len();
+        let close_token_len = close_token.column as usize + close_token.len();
         let after_line = if close_token_len < close_token.line.len() {
             Some(line_padding + &close_token.line[close_token_len..])
         } else {
@@ -342,7 +354,8 @@ impl TokenCollection {
         } else {
             self.index += 1;
         }
-        self.current()
+        let result = self.current();
+        result
     }
 
     pub fn back(&mut self) {
@@ -360,9 +373,5 @@ impl TokenCollection {
                 break;
             }
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.tokens.len() == self.index
     }
 }
