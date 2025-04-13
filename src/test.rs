@@ -12,6 +12,10 @@ pub fn run(args: cli::Args) {
                 LexerError::PermissionDenied(&args.file).print();
                 std::process::exit(ExitCode::SourcePermissionDenied as i32);
             }
+            ErrorKind::NotFound => {
+                LexerError::FileNotFound(&args.file).print();
+                std::process::exit(ExitCode::SourceFileNotFound as i32);
+            }
             _ => {
                 LexerError::Unknown(&args.file, e).print();
                 std::process::exit(ExitCode::Unknown as i32);
@@ -19,19 +23,15 @@ pub fn run(args: cli::Args) {
         },
     };
     let tokens = lexer::Lexer::new(&mut contents, args.clone()).tokenize();
-
     let program = parser::Parser::new(tokens, args.clone()).parse();
-
     let type_check = match &program {
         Ok(program) => type_checker::TypeChecker::new(program.clone(), args.clone()).check(),
         Err(program) => type_checker::TypeChecker::new(program.clone(), args.clone()).check(),
     };
 
-    match program {
-        Ok(program) => match type_check {
-            Ok(_) => interpreter::Interpreter::new(program, args).interpret(),
-            Err(_) => (),
-        },
-        Err(_) => (),
+    if let Ok(program) = program {
+        if type_check.is_ok() {
+            interpreter::Interpreter::new(program, args).interpret();
+        }
     }
 }

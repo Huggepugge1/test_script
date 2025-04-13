@@ -30,12 +30,17 @@ pub struct Args {
 pub fn run() {
     let args = Args::parse();
 
-    if args.file.extension().expect("File extension must be tesc") != "tesc" {
-        LexerError::FileExtensionNotTesc(&args.file).print();
-        std::process::exit(ExitCode::FileExtentionNotTesc as i32);
-    } else if !args.file.exists() {
+    if !args.file.exists() {
         LexerError::FileNotFound(&args.file).print();
         std::process::exit(ExitCode::SourceFileNotFound as i32);
+    }
+
+    match args.file.extension() {
+        Some(ext) if ext == "tesc" => (),
+        _ => {
+            LexerError::FileExtensionNotTesc(&args.file).print();
+            std::process::exit(ExitCode::FileExtentionNotTesc as i32);
+        }
     }
 
     test::run(args);

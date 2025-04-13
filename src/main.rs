@@ -12,7 +12,6 @@ mod test;
 mod token;
 mod r#type;
 mod type_checker;
-mod variable;
 mod white_listed_constants;
 
 fn main() {

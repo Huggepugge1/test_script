@@ -16,7 +16,7 @@ pub enum TokenType {
     BooleanLiteral { value: bool },
 
     Keyword { value: String },
-    BuiltIn { value: String },
+    BuiltIn { name: String },
 
     Type { value: Type },
     Colon,
@@ -53,13 +53,13 @@ impl std::fmt::Display for TokenType {
             TokenType::BooleanLiteral { value } => write!(f, "`{value}`"),
 
             TokenType::Keyword { value } => write!(f, "keyword `{value}`"),
-            TokenType::BuiltIn { value } => write!(f, "built-in `{value}`"),
+            TokenType::BuiltIn { name: value } => write!(f, "built-in `{value}`"),
 
             TokenType::Type { value } => write!(f, "{value}"),
             TokenType::Colon => write!(f, ":"),
 
             TokenType::Identifier { value } => {
-                if value.len() > 0 {
+                if !value.is_empty() {
                     write!(f, "identifier `{value}`")
                 } else {
                     write!(f, "identifier")
@@ -111,12 +111,10 @@ impl Token {
     }
 
     pub fn binary_operator(&self) -> bool {
-        match &self.r#type {
-            TokenType::BinaryOperator { .. }
-            | TokenType::AssignmentOperator
-            | TokenType::TypeCast => true,
-            _ => false,
-        }
+        matches!(
+            &self.r#type,
+            TokenType::BinaryOperator { .. } | TokenType::AssignmentOperator | TokenType::TypeCast
+        )
     }
 
     pub fn len(&self) -> usize {
@@ -128,7 +126,7 @@ impl Token {
             TokenType::BooleanLiteral { value } => value.to_string().len(),
 
             TokenType::Keyword { value } => value.len(),
-            TokenType::BuiltIn { value } => value.len(),
+            TokenType::BuiltIn { name: value } => value.len(),
 
             TokenType::Type { value } => value.to_string().len(),
             TokenType::Colon => 1,
@@ -158,11 +156,8 @@ impl Token {
     const LINE_NUMBER_PADDING: usize = 4;
 
     pub fn as_string(&self, style: PrintStyle) -> String {
-        let padding_length = usize::max(
-            Self::LINE_NUMBER_PADDING,
-            self.row.to_string().len() as usize,
-        );
-        let padding = &" ".repeat(padding_length + self.column as usize - 1);
+        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
+        let padding = &" ".repeat(padding_length + self.column - 1);
         format!(
             "{:<4}{}      \n\
              {}{}",
@@ -177,17 +172,14 @@ impl Token {
                 PrintStyle::Warning => "^".repeat(self.len()).bright_yellow().to_string(),
                 PrintStyle::Error => "^".repeat(self.len()).bright_red().to_string(),
                 PrintStyle::Help(message) =>
-                    "^".repeat(self.len()).bright_blue().to_string() + " " + message,
+                    format!("{} {}", "^".repeat(self.len()).bright_blue(), message),
             }
         )
     }
 
     pub fn insert_tokens(&self, tokens: Vec<TokenType>, message: &str) -> String {
-        let token_len = self.column as usize + self.len() - 1;
-        let padding_length = usize::max(
-            Self::LINE_NUMBER_PADDING,
-            self.row.to_string().len() as usize,
-        );
+        let token_len = self.column + self.len() - 1;
+        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
         let padding = &" ".repeat(padding_length + token_len);
 
         let mut token_string = tokens
@@ -218,11 +210,8 @@ impl Token {
     }
 
     pub fn wrap_in_block(&self, close_token: &Token) -> String {
-        let token_len = self.column as usize + self.len();
-        let padding_length = usize::max(
-            Self::LINE_NUMBER_PADDING,
-            self.row.to_string().len() as usize,
-        );
+        let token_len = self.column + self.len();
+        let padding_length = usize::max(Self::LINE_NUMBER_PADDING, self.row.to_string().len());
         let line_padding = " ".repeat(self.line.chars().take_while(|c| c.is_whitespace()).count());
 
         let start_line = if token_len > self.line.len() {
@@ -235,9 +224,7 @@ impl Token {
         let content_line = line_padding.clone()
             + "    "
             + &(if self.row == close_token.row {
-                self.line[token_len..close_token.column as usize]
-                    .trim()
-                    .to_string()
+                self.line[token_len..close_token.column].trim().to_string()
             } else {
                 close_token.line.to_string()
             });
@@ -245,7 +232,7 @@ impl Token {
         let end_block_line = line_padding.clone() + "}";
         let end_block_padding = line_padding.clone() + &" ".repeat(padding_length);
 
-        let close_token_len = close_token.column as usize + close_token.len();
+        let close_token_len = close_token.column + close_token.len();
         let after_line = if close_token_len < close_token.line.len() {
             Some(line_padding + &close_token.line[close_token_len..])
         } else {
@@ -354,8 +341,8 @@ impl TokenCollection {
         } else {
             self.index += 1;
         }
-        let result = self.current();
-        result
+
+        self.current()
     }
 
     pub fn back(&mut self) {

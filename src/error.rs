@@ -1,7 +1,7 @@
-use crate::instruction::InstructionResult;
+use crate::instruction::variable::{SnakeCase, Variable};
+use crate::instruction::{Instruction, InstructionResult};
 use crate::r#type::Type;
 use crate::token::{PrintStyle, Token, TokenType};
-use crate::variable::{SnakeCase, Variable};
 
 use colored::Colorize;
 use std::path::PathBuf;
@@ -15,7 +15,7 @@ pub enum LexerError<'a> {
     Unknown(&'a PathBuf, std::io::Error),
 }
 
-impl<'a> LexerError<'a> {
+impl LexerError<'_> {
     pub fn print(&self) {
         match &self {
             LexerError::FileNotFound(path) => {
@@ -69,6 +69,10 @@ pub enum ParseErrorType {
     MismatchedTokenType {
         expected: TokenType,
         actual: TokenType,
+    },
+    MismatchedInstruction {
+        expected: Vec<Instruction>,
+        actual: Instruction,
     },
 
     GlobalScope(TokenType),
@@ -128,7 +132,7 @@ impl std::fmt::Display for ParseErrorType {
                     f,
                     "Type error: Expected one of {}, found `{}`",
                     expected
-                        .into_iter()
+                        .iter()
                         .map(|r#type| format!("`{type}`"))
                         .collect::<Vec<String>>()
                         .join(", "),
@@ -152,6 +156,19 @@ impl std::fmt::Display for ParseErrorType {
 
             ParseErrorType::MismatchedArguments { expected, actual } => {
                 write!(f, "Expected {} arguments, found {}", expected, actual)
+            }
+
+            ParseErrorType::MismatchedInstruction { expected, actual } => {
+                write!(
+                    f,
+                    "Expected one of {}, found `{}`",
+                    expected
+                        .iter()
+                        .map(|r#type| format!("`{type}`"))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    actual
+                )
             }
 
             ParseErrorType::GlobalScope(token) => {
@@ -309,7 +326,7 @@ pub struct ParseWarning<'a> {
     pub token: Token,
 }
 
-impl<'a> std::fmt::Display for ParseWarningType<'a> {
+impl std::fmt::Display for ParseWarningType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
@@ -335,7 +352,7 @@ impl<'a> std::fmt::Display for ParseWarningType<'a> {
     }
 }
 
-impl<'a> ParseWarning<'a> {
+impl ParseWarning<'_> {
     pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
         ParseWarning { r#type, token }
     }

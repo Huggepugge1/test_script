@@ -1,14 +1,15 @@
 use crate::cli::Args;
 use crate::error::{ParseWarning, ParseWarningType};
-use crate::instruction::{Instruction, InstructionResult, InstructionType};
-use crate::variable::Variable;
+use crate::instruction::function::Function;
+use crate::instruction::variable::Variable;
+use crate::instruction::InstructionResult;
 
 use indexmap::IndexMap;
 
 #[derive(Debug)]
 pub struct ParseEnvironment {
     pub variables: Vec<IndexMap<String, Variable>>,
-    pub functions: IndexMap<String, Box<Instruction>>,
+    pub functions: IndexMap<String, Function>,
     pub args: Args,
 }
 
@@ -32,6 +33,12 @@ impl ParseEnvironment {
     }
 
     pub fn insert(&mut self, variable: Variable) {
+        for scope in self.variables.iter_mut().rev() {
+            if scope.contains_key(&variable.name) {
+                scope.insert(variable.name.clone(), variable);
+                return;
+            }
+        }
         self.variables
             .last_mut()
             .unwrap()
@@ -83,16 +90,11 @@ impl ParseEnvironment {
         }
     }
 
-    pub fn add_function(&mut self, function: Box<Instruction>) {
-        match &function.r#type {
-            InstructionType::Function { name, .. } => {
-                self.functions.insert(name.to_string(), function);
-            }
-            _ => unreachable!(),
-        }
+    pub fn add_function(&mut self, function: Function) {
+        self.functions.insert(function.name.clone(), function);
     }
 
-    pub fn get_function(&self, name: &str) -> Option<&Box<Instruction>> {
+    pub fn get_function(&self, name: &str) -> Option<&Function> {
         self.functions.get(name)
     }
 }
@@ -100,18 +102,10 @@ impl ParseEnvironment {
 pub struct Environment {
     pub frames: Vec<Frame>,
     pub global_constants: IndexMap<String, InstructionResult>,
-    pub functions: IndexMap<String, Instruction>,
+    pub functions: IndexMap<String, Function>,
 }
 
 impl Environment {
-    pub fn new() -> Environment {
-        Self {
-            frames: vec![],
-            global_constants: IndexMap::new(),
-            functions: IndexMap::new(),
-        }
-    }
-
     pub fn add_frame(&mut self) {
         self.frames.push(Frame {
             variables: vec![IndexMap::new()],
@@ -138,6 +132,12 @@ impl Environment {
             self.global_constants.insert(name, value);
             return;
         }
+        for scope in self.frames[len - 1].variables.iter_mut().rev() {
+            if scope.contains_key(&name) {
+                scope.insert(name, value);
+                return;
+            }
+        }
         self.frames
             .last_mut()
             .unwrap()
@@ -161,17 +161,22 @@ impl Environment {
         self.global_constants.get(name)
     }
 
-    pub fn add_function(&mut self, function: Instruction) {
-        match &function.r#type {
-            InstructionType::Function { name, .. } => {
-                self.functions.insert(name.to_string(), function);
-            }
-            _ => unreachable!(),
-        }
+    pub fn add_function(&mut self, function: Function) {
+        self.functions.insert(function.name.clone(), function);
     }
 
-    pub fn get_function(&self, name: &str) -> Option<&Instruction> {
+    pub fn get_function(&self, name: &str) -> Option<&Function> {
         self.functions.get(name)
+    }
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            frames: vec![],
+            global_constants: IndexMap::new(),
+            functions: IndexMap::new(),
+        }
     }
 }
 

@@ -127,7 +127,7 @@ impl Process {
         Ok(())
     }
 
-    pub fn read_line(&mut self, expected: String) -> Result<(), InterpreterError> {
+    pub fn read_line(&mut self, expected: &str) -> Result<(), InterpreterError> {
         if self.debug {
             println!("Reading line");
         }

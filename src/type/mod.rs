@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     String,
     Regex,
@@ -7,7 +7,7 @@ pub enum Type {
     Bool,
     None,
 
-    Iterable,
+    Iterable(Box<Type>),
 
     Any,
 }
@@ -36,9 +36,23 @@ impl std::fmt::Display for Type {
             Type::Bool => write!(f, "bool"),
             Type::None => write!(f, "none"),
 
-            Type::Iterable => write!(f, "iterable"),
+            Type::Iterable(inner) => write!(f, "Iter<{}>", inner),
 
             Type::Any => write!(f, "T"),
+        }
+    }
+}
+
+impl Type {
+    pub fn is_iterable(&self) -> bool {
+        matches!(self, Type::Regex)
+    }
+
+    pub fn get_iterable_inner_type(&self) -> Self {
+        match self {
+            Type::Regex => Type::String,
+            Type::Iterable(inner_type) => *inner_type.clone(),
+            _ => unreachable!(),
         }
     }
 }

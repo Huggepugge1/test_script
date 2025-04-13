@@ -1,10 +1,21 @@
 use crate::cli::Args;
 use crate::environment::ParseEnvironment;
 use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
-use crate::instruction::{BinaryOperator, BuiltIn, Instruction, InstructionType, UnaryOperator};
+use crate::instruction::assignment::iterable_assignment::IterableAssignment;
+use crate::instruction::assignment::Assignment;
+use crate::instruction::binary_operation::{BinaryOperation, BinaryOperator};
+use crate::instruction::block::Block;
+use crate::instruction::builtin::BuiltIn;
+use crate::instruction::conditional::Conditional;
+use crate::instruction::function::Function;
+use crate::instruction::function_call::FunctionCall;
+use crate::instruction::r#for::For;
+use crate::instruction::test::TestInstruction;
+use crate::instruction::type_cast::TypeCast;
+use crate::instruction::unary_operation::{UnaryOperation, UnaryOperator};
+use crate::instruction::{Instruction, InstructionType};
 use crate::r#type::Type;
 use crate::token::Token;
-use crate::variable::Variable;
 
 pub struct TypeChecker {
     program: Vec<Instruction>,
@@ -26,8 +37,8 @@ impl TypeChecker {
     pub fn check(&mut self) -> Result<(), ParseError> {
         for instruction in self.program.clone() {
             match instruction.r#type {
-                InstructionType::Test(instruction, _name, _command) => {
-                    match self.check_instruction(&instruction) {
+                InstructionType::Test(TestInstruction { body, .. }) => {
+                    match self.check_instruction(&body) {
                         Ok(_) => (),
                         Err(e) => {
                             e.print();
@@ -35,7 +46,7 @@ impl TypeChecker {
                         }
                     }
                 }
-                InstructionType::Function { .. } => match self.check_instruction(&instruction) {
+                InstructionType::Function(_) => match self.check_instruction(&instruction) {
                     Ok(_) => (),
                     Err(e) => {
                         e.print();
@@ -43,18 +54,15 @@ impl TypeChecker {
                     }
                 },
 
-                InstructionType::Assignment {
-                    variable: _variable,
-                    instruction,
-                    token: _token,
-                    declaration: _declaration,
-                } => match self.check_instruction(&instruction) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        e.print();
-                        self.success = false;
+                InstructionType::Assignment(assignment) => {
+                    match self.check_instruction(&assignment.body) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            e.print();
+                            self.success = false;
+                        }
                     }
-                },
+                }
                 _ => unreachable!(),
             }
         }
@@ -65,6 +73,7 @@ impl TypeChecker {
     }
 
     fn check_instruction(&mut self, instruction: &Instruction) -> Result<Type, ParseError> {
+        let token = instruction.token.clone();
         match &instruction.r#type {
             InstructionType::StringLiteral(_) => Ok(Type::String),
             InstructionType::RegexLiteral(_) => Ok(Type::Regex),
@@ -72,27 +81,20 @@ impl TypeChecker {
             InstructionType::FloatLiteral(_) => Ok(Type::Float),
             InstructionType::BooleanLiteral(_) => Ok(Type::Bool),
 
-            InstructionType::BuiltIn(instruction) => self.check_builtin(instruction),
+            InstructionType::BuiltIn(instruction) => self.check_builtin(instruction, &token),
 
-            InstructionType::Block(instructions) => self.check_block(instructions),
+            InstructionType::Block(block) => self.check_block(block),
 
-            InstructionType::Paren(instruction) => self.check_instruction(instruction),
+            InstructionType::Paren(paren) => self.check_instruction(&paren.expression),
 
-            InstructionType::Conditional {
-                condition,
-                instruction,
-                r#else,
-            } => self.check_conditional(condition, instruction, r#else),
+            InstructionType::Conditional(conditional) => self.check_conditional(conditional),
 
-            InstructionType::Function { .. } => self.check_function(instruction),
+            InstructionType::Function(function) => self.check_function(function),
 
-            InstructionType::For {
-                assignment,
-                instruction,
-            } => {
+            InstructionType::For(For { assignment, body }) => {
                 self.environment.add_scope();
-                self.check_instruction(&assignment)?;
-                let result = self.check_instruction(&instruction)?;
+                self.check_iterable_assignment(assignment)?;
+                let result = self.check_instruction(body)?;
                 self.environment.remove_scope();
                 Ok(result)
             }
@@ -105,40 +107,33 @@ impl TypeChecker {
                     }
                     None => variable,
                 };
-                Ok(variable.r#type)
+                Ok(variable.r#type.clone())
             }
 
-            InstructionType::FunctionCall { name, arguments } => {
+            InstructionType::FunctionCall(FunctionCall { name, arguments }) => {
                 self.check_function_call(name, arguments)
             }
 
-            InstructionType::Assignment {
-                variable,
-                instruction,
-                token,
-                declaration,
-            } => self.check_assignment(&variable, &instruction, token, declaration),
+            InstructionType::Assignment(assignment) => self.check_assignment(assignment),
 
-            InstructionType::IterableAssignment {
-                variable,
-                instruction,
-                token,
-            } => self.check_iterable_assignment(&variable, &instruction, token),
+            InstructionType::IterableAssignment(assignment) => {
+                self.check_iterable_assignment(assignment)
+            }
 
-            InstructionType::UnaryOperation {
+            InstructionType::UnaryOperation(UnaryOperation {
                 operator,
                 instruction,
-            } => self.check_unary(operator, &instruction),
-            InstructionType::BinaryOperation {
+            }) => self.check_unary(operator, instruction),
+            InstructionType::BinaryOperation(BinaryOperation {
                 operator,
                 left,
                 right,
-            } => self.check_binary(operator, left, right),
+            }) => self.check_binary(operator, left, right),
 
-            InstructionType::TypeCast {
-                instruction: left_instruction,
-                r#type,
-            } => self.check_type_cast(left_instruction, instruction, r#type),
+            InstructionType::TypeCast(TypeCast {
+                from: left_instruction,
+                to,
+            }) => self.check_type_cast(left_instruction, instruction, to),
 
             InstructionType::None => {
                 ParseWarning::new(
@@ -154,74 +149,47 @@ impl TypeChecker {
         }
     }
 
-    fn check_builtin(&mut self, built_in: &BuiltIn) -> Result<Type, ParseError> {
-        match built_in {
-            BuiltIn::Input(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
-                if r#type == Type::String {
-                    Ok(Type::None)
-                } else {
-                    Err(ParseError::new(
+    fn check_builtin(&mut self, built_in: &BuiltIn, token: &Token) -> Result<Type, ParseError> {
+        match built_in.name.as_str() {
+            "print" | "println" => {
+                for argument in &built_in.arguments {
+                    self.check_instruction(argument)?;
+                }
+                Ok(Type::None)
+            }
+            "input" | "output" => {
+                if built_in.arguments.len() != 1 {
+                    return Err(ParseError::new(
+                        ParseErrorType::MismatchedArguments {
+                            expected: 1,
+                            actual: built_in.arguments.len(),
+                        },
+                        token.clone(),
+                    ));
+                }
+                let r#type = self.check_instruction(&built_in.arguments[0])?;
+                match r#type {
+                    Type::String => Ok(Type::None),
+                    _ => Err(ParseError::new(
                         ParseErrorType::MismatchedType {
                             expected: vec![Type::String],
                             actual: r#type,
                         },
-                        instruction.token.clone(),
-                    ))
+                        token.clone(),
+                    )),
                 }
             }
-            BuiltIn::Output(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
-                if r#type == Type::String {
-                    Ok(Type::None)
-                } else {
-                    Err(ParseError::new(
-                        ParseErrorType::MismatchedType {
-                            expected: vec![Type::String],
-                            actual: r#type,
-                        },
-                        instruction.token.clone(),
-                    ))
-                }
-            }
-            BuiltIn::Print(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
-                if r#type == Type::String {
-                    Ok(Type::None)
-                } else {
-                    Err(ParseError::new(
-                        ParseErrorType::MismatchedType {
-                            expected: vec![Type::String],
-                            actual: r#type,
-                        },
-                        instruction.token.clone(),
-                    ))
-                }
-            }
-            BuiltIn::Println(instruction) => {
-                let r#type = self.check_instruction(&instruction)?;
-                if r#type == Type::String {
-                    Ok(Type::None)
-                } else {
-                    Err(ParseError::new(
-                        ParseErrorType::MismatchedType {
-                            expected: vec![Type::String],
-                            actual: r#type,
-                        },
-                        instruction.token.clone(),
-                    ))
-                }
-            }
+            _ => unreachable!(),
         }
     }
 
-    fn check_block(&mut self, instructions: &Vec<Instruction>) -> Result<Type, ParseError> {
+    fn check_block(&mut self, block: &Block) -> Result<Type, ParseError> {
         self.environment.add_scope();
-        if (instructions.len()) == 0 {
+        if block.statements.is_empty() {
             return Ok(Type::None);
         }
-        for instruction in &instructions[..instructions.len() - 1] {
-            match self.check_instruction(&instruction) {
+        for instruction in &block.statements[..block.statements.len() - 1] {
+            match self.check_instruction(instruction) {
                 Ok(t) => match t {
                     Type::None => (),
                     _ => {
@@ -238,21 +206,15 @@ impl TypeChecker {
                 }
             }
         }
-        let result = self.check_instruction(&instructions[instructions.len() - 1])?;
+        let result = self.check_instruction(&block.statements[block.statements.len() - 1])?;
         self.environment.remove_scope();
         Ok(result)
     }
 
-    fn check_assignment(
-        &mut self,
-        variable: &Variable,
-        instruction: &Instruction,
-        token: &Token,
-        declaration: &bool,
-    ) -> Result<Type, ParseError> {
-        let variable_type = variable.r#type;
+    fn check_assignment(&mut self, assignment: &Assignment) -> Result<Type, ParseError> {
+        let variable_type = assignment.variable.r#type.clone();
 
-        let instruction_type = self.check_instruction(&instruction)?;
+        let instruction_type = self.check_instruction(&assignment.body)?;
 
         if variable_type != Type::Any && variable_type != instruction_type {
             return Err(ParseError::new(
@@ -260,22 +222,18 @@ impl TypeChecker {
                     expected: vec![variable_type],
                     actual: instruction_type,
                 },
-                token.clone(),
+                assignment.variable.declaration_token.clone(),
             ));
         }
 
-        let mut variable = match self.environment.get(&variable.name) {
+        let mut variable = match self.environment.get(&assignment.variable.name) {
             Some(v) => v.clone(),
-            None => variable.clone(),
+            None => assignment.variable.clone(),
         };
         variable.read = false;
-        variable.last_assignment_token = token.clone();
+        variable.last_assignment_token = assignment.token.clone();
 
-        if !declaration {
-            variable.assigned = true;
-        } else {
-            variable.assigned = false;
-        }
+        variable.assigned = true;
 
         self.environment.insert(variable);
         Ok(Type::None)
@@ -283,39 +241,24 @@ impl TypeChecker {
 
     fn check_iterable_assignment(
         &mut self,
-        variable: &Variable,
-        instruction: &Instruction,
-        token: &Token,
+        assignment: &IterableAssignment,
     ) -> Result<Type, ParseError> {
-        let variable_type = variable.r#type;
-        match self.check_instruction(&instruction) {
-            Ok(Type::Regex) => match variable_type {
-                Type::String => {
-                    self.environment.insert(variable.clone());
-                    match self.environment.get(&variable.name) {
-                        Some(v) => {
-                            v.assigned = true;
-                        }
-                        None => (),
-                    }
-                    Ok(variable_type)
-                }
-                _ => Err(ParseError::new(
-                    ParseErrorType::MismatchedType {
-                        expected: vec![Type::Regex],
-                        actual: variable_type,
-                    },
-                    token.clone(),
-                )),
-            },
-            Ok(t) => Err(ParseError::new(
+        let variable_type = assignment.variable.r#type.clone();
+        let t = self.check_instruction(&assignment.body)?;
+        if t.is_iterable() && t.get_iterable_inner_type() == variable_type {
+            self.environment.insert(assignment.variable.clone());
+            if let Some(v) = self.environment.get(&assignment.variable.name) {
+                v.assigned = true;
+            }
+            Ok(variable_type)
+        } else {
+            Err(ParseError::new(
                 ParseErrorType::MismatchedType {
-                    expected: vec![Type::Iterable],
+                    expected: vec![Type::Iterable(Box::new(variable_type))],
                     actual: t,
                 },
-                token.clone(),
-            )),
-            Err(e) => Err(e),
+                assignment.variable.last_assignment_token.clone(),
+            ))
         }
     }
 
@@ -612,39 +555,52 @@ impl TypeChecker {
         r#type: &Type,
     ) -> Result<Type, ParseError> {
         let instruction_type = self.check_instruction(left_instruction)?;
-        match (instruction_type, r#type) {
-            (Type::String, Type::Int) => Ok(Type::Int),
-            (Type::Int, Type::String) => Ok(Type::String),
-
-            (Type::String, Type::Bool) => Ok(Type::Bool),
-            (Type::Bool, Type::String) => Ok(Type::String),
-            (Type::String, Type::Regex) => Ok(Type::Regex),
-            _ => Err(ParseError::new(
+        match match r#type {
+            Type::String => match instruction_type {
+                Type::Int => Ok(Type::String),
+                Type::Float => Ok(Type::String),
+                Type::Bool => Ok(Type::String),
+                _ => Err(()),
+            },
+            Type::Int => match instruction_type {
+                Type::String => Ok(Type::Int),
+                Type::Float => Ok(Type::Int),
+                Type::Bool => Ok(Type::Int),
+                _ => Err(()),
+            },
+            Type::Float => match instruction_type {
+                Type::String => Ok(Type::Float),
+                Type::Int => Ok(Type::Float),
+                Type::Bool => Ok(Type::Float),
+                _ => Err(()),
+            },
+            Type::Bool => match instruction_type {
+                Type::String => Ok(Type::Bool),
+                Type::Int => Ok(Type::Bool),
+                Type::Float => Ok(Type::Bool),
+                _ => Err(()),
+            },
+            _ => Err(()),
+        } {
+            Ok(t) => Ok(t),
+            Err(()) => Err(ParseError::new(
                 ParseErrorType::TypeCast {
                     from: instruction_type,
-                    to: *r#type,
+                    to: r#type.clone(),
                 },
                 instruction.token.clone(),
             )),
         }
     }
 
-    fn check_function(&mut self, instruction: &Instruction) -> Result<Type, ParseError> {
-        let (parameters, statement) = match &instruction.r#type {
-            InstructionType::Function {
-                parameters,
-                instruction,
-                ..
-            } => (parameters, instruction),
-            _ => unreachable!(),
-        };
-        self.environment.add_function(Box::new(instruction.clone()));
+    fn check_function(&mut self, function: &Function) -> Result<Type, ParseError> {
+        self.environment.add_function(function.clone());
 
         self.environment.add_scope();
-        for parameter in parameters {
+        for parameter in &function.parameters {
             self.environment.insert(parameter.clone());
         }
-        let result = self.check_instruction(statement);
+        let result = self.check_instruction(&function.body);
         self.environment.remove_scope();
         result
     }
@@ -652,66 +608,52 @@ impl TypeChecker {
     fn check_function_call(
         &mut self,
         name: &str,
-        arguments: &Vec<Instruction>,
+        arguments: &[Instruction],
     ) -> Result<Type, ParseError> {
         match &self.environment.functions.get(name).cloned() {
-            Some(instruction) => {
-                let (parameters, return_type) = match &instruction.r#type {
-                    InstructionType::Function {
-                        parameters,
-                        return_type,
-                        ..
-                    } => (parameters, return_type),
-                    _ => unreachable!(),
-                };
-
-                if parameters.len() != arguments.len() {
+            Some(function) => {
+                if function.parameters.len() != arguments.len() {
                     return Err(ParseError::new(
                         ParseErrorType::MismatchedArguments {
-                            expected: parameters.len(),
+                            expected: function.parameters.len(),
                             actual: arguments.len(),
                         },
                         arguments[arguments.len() - 1].token.clone(),
                     ));
                 }
 
-                for (parameter, argument) in parameters.iter().zip(arguments.iter()) {
+                for (parameter, argument) in function.parameters.iter().zip(arguments.iter()) {
                     let argument_type = self.check_instruction(argument)?;
                     if parameter.r#type != argument_type {
                         return Err(ParseError::new(
                             ParseErrorType::MismatchedType {
-                                expected: vec![parameter.r#type],
+                                expected: vec![parameter.r#type.clone()],
                                 actual: argument_type,
                             },
                             argument.token.clone(),
                         ));
                     }
                 }
-                Ok(*return_type)
+                Ok(function.return_type.clone())
             }
             None => unreachable!(),
         }
     }
 
-    fn check_conditional(
-        &mut self,
-        condition: &Instruction,
-        instruction: &Instruction,
-        r#else: &Instruction,
-    ) -> Result<Type, ParseError> {
-        let condition_type = self.check_instruction(&condition)?;
+    fn check_conditional(&mut self, conditional: &Conditional) -> Result<Type, ParseError> {
+        let condition_type = self.check_instruction(&conditional.condition)?;
         if condition_type != Type::Bool {
             return Err(ParseError::new(
                 ParseErrorType::MismatchedType {
                     expected: vec![Type::Bool],
                     actual: condition_type,
                 },
-                condition.token.clone(),
+                conditional.condition.token.clone(),
             ));
         }
-        let result = self.check_instruction(&instruction)?;
-        let result_else = if *r#else != Instruction::NONE {
-            self.check_instruction(&r#else)?
+        let result = self.check_instruction(&conditional.r#if)?;
+        let result_else = if *conditional.r#else != Instruction::NONE {
+            self.check_instruction(&conditional.r#else)?
         } else {
             Type::None
         };
@@ -724,7 +666,7 @@ impl TypeChecker {
                     expected: vec![result],
                     actual: result_else,
                 },
-                r#else.inner_most().token.clone(),
+                conditional.r#else.inner_most().token.clone(),
             ))
         }
     }

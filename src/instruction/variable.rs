@@ -1,17 +1,21 @@
+use crate::environment::Environment;
+use crate::error::InterpreterError;
 use crate::r#type::Type;
 use crate::token::Token;
+
+use super::InstructionResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     pub name: String,
-    pub r#const: bool,
     pub r#type: Type,
 
     pub declaration_token: Token,
     pub identifier_token: Token,
-
     pub last_assignment_token: Token,
+    pub type_token: Token,
 
+    pub r#const: bool,
     pub read: bool,
     pub assigned: bool,
 }
@@ -76,5 +80,14 @@ impl SnakeCase for std::string::String {
             result.push(c.to_uppercase().next().unwrap());
         }
         result
+    }
+}
+
+impl Variable {
+    pub fn interpret(
+        &self,
+        environment: &mut Environment,
+    ) -> Result<InstructionResult, InterpreterError> {
+        Ok(environment.get(&self.name).unwrap().clone())
     }
 }

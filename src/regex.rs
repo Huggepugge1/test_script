@@ -1,13 +1,14 @@
 use crate::error::{ParseError, ParseErrorType};
+use crate::instruction::InstructionResult;
 use crate::token::Token;
 use regex_syntax::hir;
 
-fn expand_class(class: hir::ClassUnicode) -> Vec<String> {
+fn expand_class(class: hir::ClassUnicode) -> Vec<InstructionResult> {
     let mut result = Vec::new();
     for range in class.ranges().iter() {
         for c in range.start()..=range.end() {
             if c != '\n' && c.is_ascii() && (c.is_ascii_graphic() || c.is_ascii_whitespace()) {
-                result.push(c.to_string());
+                result.push(InstructionResult::String(c.to_string()));
             }
         }
     }
@@ -18,9 +19,9 @@ fn parse_repetiton(
     hir: hir::Repetition,
     token: &Token,
     max: u32,
-) -> Result<Vec<String>, ParseError> {
+) -> Result<Vec<InstructionResult>, ParseError> {
     let sub_class = parse_kind((hir.sub).into_kind(), token, max)?;
-    let mut result: Vec<String> = Vec::new();
+    let mut result = Vec::new();
     let min = hir.min;
     let max = hir.max.unwrap_or(max);
     for i in min..=max {
@@ -28,14 +29,23 @@ fn parse_repetiton(
             (0..i).map(|_| sub_class.iter().cloned()),
         );
         for combination in combinations.clone() {
-            let joined = combination.join("");
-            result.push(joined);
+            result.push(InstructionResult::String(
+                combination
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(""),
+            ));
         }
     }
     Ok(result)
 }
 
-fn parse_concat(hirs: Vec<hir::Hir>, token: &Token, max: u32) -> Result<Vec<String>, ParseError> {
+fn parse_concat(
+    hirs: Vec<hir::Hir>,
+    token: &Token,
+    max: u32,
+) -> Result<Vec<InstructionResult>, ParseError> {
     let mut result = Vec::new();
     for hir in hirs {
         let mut sub_class = parse_kind(hir.into_kind(), token, max)?;
@@ -47,7 +57,7 @@ fn parse_concat(hirs: Vec<hir::Hir>, token: &Token, max: u32) -> Result<Vec<Stri
             for i in old_result {
                 for sub in sub_class.iter() {
                     let joined = format!("{}{}", i, sub);
-                    result.push(joined);
+                    result.push(InstructionResult::String(joined));
                 }
             }
         }
@@ -55,9 +65,15 @@ fn parse_concat(hirs: Vec<hir::Hir>, token: &Token, max: u32) -> Result<Vec<Stri
     Ok(result)
 }
 
-fn parse_kind(kind: hir::HirKind, token: &Token, max: u32) -> Result<Vec<String>, ParseError> {
+fn parse_kind(
+    kind: hir::HirKind,
+    token: &Token,
+    max: u32,
+) -> Result<Vec<InstructionResult>, ParseError> {
     match kind {
-        hir::HirKind::Literal(hir) => Ok(vec![String::from_utf8_lossy(&hir.0).to_string()]),
+        hir::HirKind::Literal(hir) => Ok(vec![InstructionResult::String(
+            String::from_utf8_lossy(&hir.0).to_string(),
+        )]),
         hir::HirKind::Class(hir) => match hir {
             hir::Class::Unicode(class) => Ok(expand_class(class)),
             hir::Class::Bytes(class) => Ok(expand_class(class.to_unicode_class().unwrap())),
@@ -68,7 +84,7 @@ fn parse_kind(kind: hir::HirKind, token: &Token, max: u32) -> Result<Vec<String>
     }
 }
 
-pub fn parse(token: &Token, max: u32) -> Result<Vec<String>, ParseError> {
+pub fn parse(token: &Token, max: u32) -> Result<Vec<InstructionResult>, ParseError> {
     let value = match &token.r#type {
         crate::token::TokenType::RegexLiteral { value } => value,
         _ => unreachable!(),
