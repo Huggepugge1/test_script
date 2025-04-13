@@ -1,4 +1,11 @@
-use crate::{environment::Environment, error::InterpreterError, process::Process};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError, ParserErrorType},
+    process::Process,
+    r#type::Type,
+    token::Token,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -90,6 +97,37 @@ impl std::fmt::Display for BinaryOperation {
     }
 }
 
+impl TypeCheck for BinaryOperation {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        match self.operator {
+            BinaryOperator::Addition => self.type_check_addition(environment, token),
+            BinaryOperator::Subtraction => self.type_check_subtraction(environment, token),
+            BinaryOperator::Multiplication => self.type_check_multiplication(environment, token),
+            BinaryOperator::Division => self.type_check_division(environment, token),
+            BinaryOperator::Modulo => self.type_check_modulo(environment, token),
+
+            BinaryOperator::Equal => self.type_check_equal(environment, token),
+            BinaryOperator::NotEqual => self.type_check_not_equal(environment, token),
+
+            BinaryOperator::LessThan => self.type_check_less_than(environment, token),
+            BinaryOperator::LessThanOrEqual => {
+                self.type_check_less_than_or_equal(environment, token)
+            }
+            BinaryOperator::GreaterThan => self.type_check_greater_than(environment, token),
+            BinaryOperator::GreaterThanOrEqual => {
+                self.type_check_greater_than_or_equal(environment, token)
+            }
+
+            BinaryOperator::And => self.type_check_and(environment, token),
+            BinaryOperator::Or => self.type_check_or(environment, token),
+        }
+    }
+}
+
 impl BinaryOperation {
     pub fn interpret(
         &self,
@@ -119,6 +157,34 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_addition(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        match (&left_type, &right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::String, Type::String) => Ok(Type::String),
+            (Type::Int | Type::Float | Type::String, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            )),
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int, Type::Float, Type::String],
+                    actual: left_type,
+                },
+                self.left.token.clone(),
+            )),
+        }
+    }
+
     fn interpret_addition(
         &self,
         environment: &mut Environment,
@@ -141,6 +207,32 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_subtraction(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        match (&left_type, &right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::Int | Type::Float, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            )),
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int, Type::Float],
+                    actual: left_type,
+                },
+                self.left.token.clone(),
+            )),
+        }
+    }
     fn interpret_subtraction(
         &self,
         environment: &mut Environment,
@@ -157,6 +249,41 @@ impl BinaryOperation {
                 Ok(InstructionResult::Float(left - right))
             }
             _ => unreachable!(),
+        }
+    }
+
+    fn type_check_multiplication(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        match (&left_type, &right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::String, Type::Int) => Ok(Type::String),
+            (Type::String, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            )),
+            (Type::Int | Type::Float, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.left.token.clone(),
+            )),
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int, Type::Float],
+                    actual: left_type,
+                },
+                token.clone(),
+            )),
         }
     }
 
@@ -182,6 +309,33 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_division(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        match (&left_type, &right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Float),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::Int | Type::Float, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            )),
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int, Type::Float],
+                    actual: left_type,
+                },
+                self.left.token.clone(),
+            )),
+        }
+    }
+
     fn interpret_division(
         &self,
         environment: &mut Environment,
@@ -198,6 +352,33 @@ impl BinaryOperation {
                 Ok(InstructionResult::Float(left / right))
             }
             _ => unreachable!(),
+        }
+    }
+
+    fn type_check_modulo(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        match (&left_type, &right_type) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            (Type::Float, Type::Float) => Ok(Type::Float),
+            (Type::Int | Type::Float, _) => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            )),
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Int, Type::Float],
+                    actual: left_type,
+                },
+                self.left.token.clone(),
+            )),
         }
     }
 
@@ -218,6 +399,25 @@ impl BinaryOperation {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn type_check_equal(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
     }
 
     fn interpret_equal(
@@ -245,6 +445,25 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_not_equal(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
+    }
+
     fn interpret_not_equal(
         &self,
         environment: &mut Environment,
@@ -270,6 +489,25 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_less_than(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
+    }
+
     fn interpret_less_than(
         &self,
         environment: &mut Environment,
@@ -287,6 +525,25 @@ impl BinaryOperation {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn type_check_less_than_or_equal(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
     }
 
     fn interpret_less_than_or_equal(
@@ -308,6 +565,25 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_greater_than(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
+    }
+
     fn interpret_greater_than(
         &self,
         environment: &mut Environment,
@@ -325,6 +601,25 @@ impl BinaryOperation {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn type_check_greater_than_or_equal(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
     }
 
     fn interpret_greater_than_or_equal(
@@ -346,6 +641,25 @@ impl BinaryOperation {
         }
     }
 
+    fn type_check_and(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
+    }
+
     fn interpret_and(
         &self,
         environment: &mut Environment,
@@ -360,6 +674,25 @@ impl BinaryOperation {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn type_check_or(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        let left_type = self.left.type_check(environment)?;
+        let right_type = self.right.type_check(environment)?;
+        if left_type != right_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![left_type],
+                    actual: right_type,
+                },
+                self.right.token.clone(),
+            ));
+        }
+        Ok(Type::Bool)
     }
 
     fn interpret_or(

@@ -1,7 +1,8 @@
-use crate::environment::Environment;
-use crate::error::InterpreterError;
+use crate::environment::{Environment, ParserEnvironment};
+use crate::error::{InterpreterError, ParserError};
 use crate::r#type::Type;
 use crate::token::Token;
+use crate::type_checker::TypeCheck;
 
 use super::InstructionResult;
 
@@ -80,6 +81,20 @@ impl SnakeCase for std::string::String {
             result.push(c.to_uppercase().next().unwrap());
         }
         result
+    }
+}
+
+impl TypeCheck for Variable {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        Ok(match environment.get(&self.name) {
+            Some(variable) => variable.clone(),
+            None => self.clone(),
+        }
+        .r#type)
     }
 }
 

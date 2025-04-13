@@ -1,4 +1,11 @@
-use crate::{environment::Environment, error::InterpreterError, process::Process};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError},
+    process::Process,
+    r#type::Type,
+    token::Token,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -10,6 +17,16 @@ pub struct Paren {
 impl std::fmt::Display for Paren {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({})", self.expression)
+    }
+}
+
+impl TypeCheck for Paren {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        self.expression.type_check(environment)
     }
 }
 

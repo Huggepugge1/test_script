@@ -1,3 +1,7 @@
+use crate::{
+    environment::ParserEnvironment, error::ParserError, r#type::Type, type_checker::TypeCheck,
+};
+
 use super::InstructionResult;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,9 +15,13 @@ impl std::fmt::Display for FloatLiteral {
     }
 }
 
-impl From<FloatLiteral> for String {
-    fn from(val: FloatLiteral) -> Self {
-        val.value.to_string()
+impl TypeCheck for FloatLiteral {
+    fn type_check(
+        &self,
+        _environment: &mut ParserEnvironment,
+        _token: &crate::token::Token,
+    ) -> Result<Type, ParserError> {
+        Ok(Type::Float)
     }
 }
 

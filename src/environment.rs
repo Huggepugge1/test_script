@@ -1,5 +1,5 @@
 use crate::cli::Args;
-use crate::error::{ParseWarning, ParseWarningType};
+use crate::error::{ParserWarning, ParserWarningType};
 use crate::instruction::function::Function;
 use crate::instruction::variable::Variable;
 use crate::instruction::InstructionResult;
@@ -7,15 +7,15 @@ use crate::instruction::InstructionResult;
 use indexmap::IndexMap;
 
 #[derive(Debug)]
-pub struct ParseEnvironment {
+pub struct ParserEnvironment {
     pub variables: Vec<IndexMap<String, Variable>>,
     pub functions: IndexMap<String, Function>,
     pub args: Args,
 }
 
-impl ParseEnvironment {
-    pub fn new(args: Args) -> ParseEnvironment {
-        ParseEnvironment {
+impl ParserEnvironment {
+    pub fn new(args: Args) -> ParserEnvironment {
+        ParserEnvironment {
             variables: vec![IndexMap::new()],
             functions: IndexMap::new(),
             args,
@@ -48,6 +48,7 @@ impl ParseEnvironment {
     pub fn get(&mut self, name: &str) -> Option<&mut Variable> {
         for scope in &mut self.variables.iter_mut().rev() {
             if let Some(r#type) = scope.get_mut(name) {
+                r#type.read = true;
                 return Some(r#type);
             }
         }
@@ -59,14 +60,14 @@ impl ParseEnvironment {
         for variable in &self.variables[self.variables.len() - 1] {
             if !variable.1.read && variable.1.name.chars().nth(0).unwrap() != '_' {
                 if variable.1.declaration_token != variable.1.last_assignment_token {
-                    ParseWarning::new(
-                        ParseWarningType::VariableNotRead,
+                    ParserWarning::new(
+                        ParserWarningType::VariableNotRead,
                         variable.1.last_assignment_token.clone(),
                     )
                     .print(self.args.disable_warnings);
                 } else {
-                    ParseWarning::new(
-                        ParseWarningType::UnusedVariable,
+                    ParserWarning::new(
+                        ParserWarningType::UnusedVariable,
                         variable.1.identifier_token.clone(),
                     )
                     .print(self.args.disable_warnings);
@@ -81,8 +82,8 @@ impl ParseEnvironment {
                 && !variable.1.assigned
                 && variable.1.name.chars().nth(0).unwrap() != '_'
             {
-                ParseWarning::new(
-                    ParseWarningType::VariableNeverReAssigned,
+                ParserWarning::new(
+                    ParserWarningType::VariableNeverReAssigned,
                     variable.1.declaration_token.clone(),
                 )
                 .print(self.args.disable_warnings);

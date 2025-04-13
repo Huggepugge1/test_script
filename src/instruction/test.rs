@@ -1,5 +1,12 @@
-use crate::environment::Environment;
-use crate::{cli::Args, interpreter::Test, process::Process};
+use crate::{
+    cli::Args,
+    environment::{Environment, ParserEnvironment},
+    error::ParserError,
+    interpreter::Test,
+    process::Process,
+    r#type::Type,
+    type_checker::TypeCheck,
+};
 
 use super::Instruction;
 
@@ -13,6 +20,19 @@ pub struct TestInstruction {
 impl std::fmt::Display for TestInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "test {} {{ {} }}", self.name, self.body)
+    }
+}
+
+impl TypeCheck for TestInstruction {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &crate::token::Token,
+    ) -> Result<Type, ParserError> {
+        environment.add_scope();
+        let result = self.body.type_check(environment)?;
+        environment.remove_scope();
+        Ok(result)
     }
 }
 

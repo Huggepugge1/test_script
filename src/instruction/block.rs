@@ -1,4 +1,10 @@
-use crate::{environment::Environment, error::InterpreterError, process::Process};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError, ParserWarning, ParserWarningType},
+    process::Process,
+    r#type::Type,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -14,6 +20,40 @@ impl std::fmt::Display for Block {
             writeln!(f, "    {}", statement)?;
         }
         write!(f, "}}")
+    }
+}
+
+impl TypeCheck for Block {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &crate::token::Token,
+    ) -> Result<Type, ParserError> {
+        let mut result = Type::None;
+        let mut failed: Option<ParserError> = None;
+        environment.add_scope();
+        for (index, statement) in self.statements.iter().enumerate() {
+            match statement.type_check(environment) {
+                Ok(value) => {
+                    if value != Type::None && index != self.statements.len() - 1 {
+                        ParserWarning::new(ParserWarningType::UnusedValue, statement.token.clone())
+                            .print(environment.args.disable_warnings);
+                    }
+                    result = value;
+                }
+                Err(err) => {
+                    if let Some(e) = failed {
+                        e.print();
+                    }
+                    failed = Some(err);
+                }
+            }
+        }
+        environment.remove_scope();
+        match failed {
+            Some(err) => Err(err),
+            None => Ok(result),
+        }
     }
 }
 

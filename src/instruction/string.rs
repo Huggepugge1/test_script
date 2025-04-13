@@ -1,3 +1,8 @@
+use crate::{
+    environment::ParserEnvironment, error::ParserError, r#type::Type, token::Token,
+    type_checker::TypeCheck,
+};
+
 use super::InstructionResult;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +13,16 @@ pub struct StringLiteral {
 impl std::fmt::Display for StringLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl TypeCheck for StringLiteral {
+    fn type_check(
+        &self,
+        _environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        Ok(Type::String)
     }
 }
 

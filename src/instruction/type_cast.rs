@@ -1,4 +1,10 @@
-use crate::{environment::Environment, error::InterpreterError, process::Process, r#type::Type};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::InterpreterError,
+    process::Process,
+    r#type::Type,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -11,6 +17,26 @@ pub struct TypeCast {
 impl std::fmt::Display for TypeCast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} as {}", self.from, self.to)
+    }
+}
+
+impl TypeCheck for TypeCast {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &crate::token::Token,
+    ) -> Result<Type, crate::error::ParserError> {
+        let from_type = self.from.type_check(environment)?;
+        if !from_type.can_cast_to(&self.to) {
+            return Err(crate::error::ParserError::new(
+                crate::error::ParserErrorType::TypeCast {
+                    from: from_type,
+                    to: self.to.clone(),
+                },
+                token.clone(),
+            ));
+        }
+        Ok(self.to.clone())
     }
 }
 
@@ -34,13 +60,9 @@ impl TypeCast {
         environtment: &mut Environment,
         process: &mut Option<&mut Process>,
     ) -> Result<InstructionResult, InterpreterError> {
-        let from = self.from.interpret(environtment, process)?;
-        Ok(match from {
-            InstructionResult::Int(i) => InstructionResult::String(i.to_string()),
-            InstructionResult::Float(f) => InstructionResult::String(f.to_string()),
-            InstructionResult::Bool(b) => InstructionResult::String(b.to_string()),
-            _ => unreachable!(),
-        })
+        Ok(InstructionResult::String(
+            self.from.interpret(environtment, process)?.to_string(),
+        ))
     }
 
     fn cast_to_int(

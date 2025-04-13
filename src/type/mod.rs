@@ -12,20 +12,6 @@ pub enum Type {
     Any,
 }
 
-impl Type {
-    pub fn from(value: &str) -> Self {
-        match value {
-            "string" => Type::String,
-            "regex" => Type::Regex,
-            "int" => Type::Int,
-            "float" => Type::Float,
-            "bool" => Type::Bool,
-            "none" => Type::None,
-            _ => panic!("Invalid type"),
-        }
-    }
-}
-
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -44,6 +30,34 @@ impl std::fmt::Display for Type {
 }
 
 impl Type {
+    pub fn from(value: &str) -> Self {
+        match value {
+            "string" => Type::String,
+            "regex" => Type::Regex,
+            "int" => Type::Int,
+            "float" => Type::Float,
+            "bool" => Type::Bool,
+            "none" => Type::None,
+            _ => panic!("Invalid type"),
+        }
+    }
+
+    pub fn can_cast_to(&self, other: &Type) -> bool {
+        if other == &Type::String {
+            return true;
+        }
+        match self {
+            Type::String => matches!(other, Type::Int | Type::Float | Type::Bool),
+
+            Type::Int => matches!(other, Type::Float | Type::Bool),
+            Type::Float => matches!(other, Type::Int | Type::Bool),
+
+            Type::Bool => matches!(other, Type::Int | Type::Float),
+
+            _ => false,
+        }
+    }
+
     pub fn is_iterable(&self) -> bool {
         matches!(self, Type::Regex)
     }

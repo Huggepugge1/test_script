@@ -1,7 +1,7 @@
 const QUIT: string = "q";
 
 test1("java Main.java") {
-    let inp: string = "";
+    let inp: string = {"aoeu";}
     for i: string in `\d` {
         println("Position: " + i);
         inp = inp + i;

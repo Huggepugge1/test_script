@@ -1,4 +1,11 @@
-use crate::{environment::Environment, error::InterpreterError, process::Process};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError, ParserErrorType},
+    process::Process,
+    r#type::Type,
+    token::Token,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -20,6 +27,40 @@ impl std::fmt::Display for FunctionCall {
                 .collect::<Vec<_>>()
                 .join(", ")
         )
+    }
+}
+
+impl TypeCheck for FunctionCall {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        let function = environment.get_function(&self.name).unwrap().clone();
+        if function.parameters.len() != self.arguments.len() {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedNumberOfArguments {
+                    expected: function.parameters.len(),
+                    actual: self.arguments.len(),
+                },
+                token.clone(),
+            ));
+        }
+
+        for (parameter, argument) in function.parameters.iter().zip(&self.arguments) {
+            let argument_type = argument.type_check(environment)?;
+            if parameter.r#type != argument_type {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedType {
+                        expected: vec![parameter.r#type.clone()],
+                        actual: argument_type,
+                    },
+                    argument.token.clone(),
+                ));
+            }
+        }
+
+        Ok(function.return_type)
     }
 }
 

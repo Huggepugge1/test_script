@@ -1,4 +1,10 @@
-use crate::{environment::Environment, error::InterpreterError, r#type::Type};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError},
+    r#type::Type,
+    token::Token,
+    type_checker::TypeCheck,
+};
 
 use super::{variable::Variable, Instruction, InstructionResult};
 
@@ -21,6 +27,23 @@ impl std::fmt::Display for Function {
         }
         write!(f, "): {} ", self.return_type)?;
         write!(f, "{}", self.body)
+    }
+}
+
+impl TypeCheck for Function {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        _token: &Token,
+    ) -> Result<Type, ParserError> {
+        environment.add_function(self.clone());
+        environment.add_scope();
+        for parameter in &self.parameters {
+            environment.insert(parameter.clone());
+        }
+        let result = self.body.type_check(environment);
+        environment.remove_scope();
+        result
     }
 }
 

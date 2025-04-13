@@ -1,4 +1,11 @@
-use crate::{error::InterpreterError, instruction::InstructionType};
+use crate::{
+    environment::{Environment, ParserEnvironment},
+    error::{InterpreterError, ParserError, ParserErrorType},
+    instruction::InstructionType,
+    process::Process,
+    r#type::Type,
+    token::Token,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -20,10 +27,39 @@ impl std::fmt::Display for Conditional {
 }
 
 impl Conditional {
+    pub fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        let condition_type = self.condition.type_check(environment)?;
+        if condition_type != Type::Bool {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::Bool],
+                    actual: condition_type,
+                },
+                token.clone(),
+            ));
+        }
+        let if_type = self.r#if.type_check(environment)?;
+        let else_type = self.r#else.type_check(environment)?;
+        if if_type != else_type {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![if_type],
+                    actual: condition_type,
+                },
+                token.clone(),
+            ));
+        }
+        Ok(if_type)
+    }
+
     pub fn interpret(
         &self,
-        environment: &mut crate::environment::Environment,
-        process: &mut Option<&mut crate::process::Process>,
+        environment: &mut Environment,
+        process: &mut Option<&mut Process>,
     ) -> Result<InstructionResult, InterpreterError> {
         let condition_result = self.condition.interpret(environment, process)?;
         match condition_result {

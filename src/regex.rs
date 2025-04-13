@@ -1,4 +1,4 @@
-use crate::error::{ParseError, ParseErrorType};
+use crate::error::{ParserError, ParserErrorType};
 use crate::instruction::InstructionResult;
 use crate::token::Token;
 use regex_syntax::hir;
@@ -19,7 +19,7 @@ fn parse_repetiton(
     hir: hir::Repetition,
     token: &Token,
     max: u32,
-) -> Result<Vec<InstructionResult>, ParseError> {
+) -> Result<Vec<InstructionResult>, ParserError> {
     let sub_class = parse_kind((hir.sub).into_kind(), token, max)?;
     let mut result = Vec::new();
     let min = hir.min;
@@ -45,7 +45,7 @@ fn parse_concat(
     hirs: Vec<hir::Hir>,
     token: &Token,
     max: u32,
-) -> Result<Vec<InstructionResult>, ParseError> {
+) -> Result<Vec<InstructionResult>, ParserError> {
     let mut result = Vec::new();
     for hir in hirs {
         let mut sub_class = parse_kind(hir.into_kind(), token, max)?;
@@ -69,7 +69,7 @@ fn parse_kind(
     kind: hir::HirKind,
     token: &Token,
     max: u32,
-) -> Result<Vec<InstructionResult>, ParseError> {
+) -> Result<Vec<InstructionResult>, ParserError> {
     match kind {
         hir::HirKind::Literal(hir) => Ok(vec![InstructionResult::String(
             String::from_utf8_lossy(&hir.0).to_string(),
@@ -80,11 +80,11 @@ fn parse_kind(
         },
         hir::HirKind::Repetition(hir) => Ok(parse_repetiton(hir, token, max)?),
         hir::HirKind::Concat(hirs) => Ok(parse_concat(hirs, token, max)?),
-        _hir => Err(ParseError::new(ParseErrorType::RegexError, token.clone())),
+        _hir => Err(ParserError::new(ParserErrorType::RegexError, token.clone())),
     }
 }
 
-pub fn parse(token: &Token, max: u32) -> Result<Vec<InstructionResult>, ParseError> {
+pub fn parse(token: &Token, max: u32) -> Result<Vec<InstructionResult>, ParserError> {
     let value = match &token.r#type {
         crate::token::TokenType::RegexLiteral { value } => value,
         _ => unreachable!(),

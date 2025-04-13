@@ -1,4 +1,10 @@
-use crate::error::InterpreterError;
+use crate::{
+    environment::ParserEnvironment,
+    error::{InterpreterError, ParserError, ParserErrorType},
+    r#type::Type,
+    token::Token,
+    type_checker::TypeCheck,
+};
 
 use super::{Instruction, InstructionResult};
 
@@ -23,7 +29,77 @@ impl std::fmt::Display for BuiltIn {
     }
 }
 
+impl TypeCheck for BuiltIn {
+    fn type_check(
+        &self,
+        _environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        match self.name.as_str() {
+            "print" | "println" => self.type_check_print(_environment, token),
+            "input" | "output" => self.type_check_input_output(_environment, token),
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl BuiltIn {
+    fn type_check_print(
+        &self,
+        _environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        if self.arguments.is_empty() {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedNumberOfArguments {
+                    expected: 1,
+                    actual: self.arguments.len(),
+                },
+                token.clone(),
+            ));
+        }
+        for arg in &self.arguments {
+            let r#type = arg.type_check(_environment)?;
+            if r#type != Type::String {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedType {
+                        expected: vec![Type::String],
+                        actual: r#type,
+                    },
+                    token.clone(),
+                ));
+            }
+        }
+        Ok(Type::None)
+    }
+
+    fn type_check_input_output(
+        &self,
+        _environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        if self.arguments.len() != 1 {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedNumberOfArguments {
+                    expected: 1,
+                    actual: self.arguments.len(),
+                },
+                token.clone(),
+            ));
+        }
+        let r#type = self.arguments[0].type_check(_environment)?;
+        if r#type != Type::String {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedType {
+                    expected: vec![Type::String],
+                    actual: r#type,
+                },
+                token.clone(),
+            ));
+        }
+        Ok(Type::None)
+    }
+
     pub fn interpret(
         &self,
         environment: &mut crate::environment::Environment,

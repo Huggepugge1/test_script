@@ -52,7 +52,7 @@ impl LexerError<'_> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ParseErrorType {
+pub enum ParserErrorType {
     UnexpectedToken(TokenType),
 
     UnexpectedEndOfFile,
@@ -62,7 +62,7 @@ pub enum ParseErrorType {
         expected: Vec<Type>,
         actual: Type,
     },
-    MismatchedArguments {
+    MismatchedNumberOfArguments {
         expected: usize,
         actual: usize,
     },
@@ -93,10 +93,10 @@ pub enum ParseErrorType {
     None,
 }
 
-impl std::fmt::Display for ParseErrorType {
+impl std::fmt::Display for ParserErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::UnexpectedToken(token) => {
+            ParserErrorType::UnexpectedToken(token) => {
                 let token = match token {
                     TokenType::Semicolon
                     | TokenType::OpenParen
@@ -110,8 +110,8 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "Unexpected token: {}", token)
             }
 
-            ParseErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
-            ParseErrorType::UnclosedDelimiter(token) => {
+            ParserErrorType::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
+            ParserErrorType::UnclosedDelimiter(token) => {
                 let token = match token {
                     TokenType::OpenParen
                     | TokenType::CloseParen
@@ -122,7 +122,7 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "Unclosed delimiter: {}", token)
             }
 
-            ParseErrorType::MismatchedType { expected, actual } => match expected.len() {
+            ParserErrorType::MismatchedType { expected, actual } => match expected.len() {
                 1 => write!(
                     f,
                     "Type error: Expected `{}`, found `{}`",
@@ -140,7 +140,7 @@ impl std::fmt::Display for ParseErrorType {
                 ),
             },
 
-            ParseErrorType::MismatchedTokenType { expected, actual } => {
+            ParserErrorType::MismatchedTokenType { expected, actual } => {
                 let expected = match expected {
                     TokenType::Semicolon
                     | TokenType::OpenParen
@@ -151,17 +151,17 @@ impl std::fmt::Display for ParseErrorType {
                     | TokenType::Type { .. } => format!("`{expected}`"),
                     _ => format!("{expected}"),
                 };
-                write!(f, "Expected {expected}, found {actual}")
+                write!(f, "Expected `{}`, found `{}`", expected, actual)
             }
 
-            ParseErrorType::MismatchedArguments { expected, actual } => {
+            ParserErrorType::MismatchedNumberOfArguments { expected, actual } => {
                 write!(f, "Expected {} arguments, found {}", expected, actual)
             }
 
-            ParseErrorType::MismatchedInstruction { expected, actual } => {
+            ParserErrorType::MismatchedInstruction { expected, actual } => {
                 write!(
                     f,
-                    "Expected one of {}, found `{}`",
+                    "Expected one of `{}`, found `{}`",
                     expected
                         .iter()
                         .map(|r#type| format!("`{type}`"))
@@ -171,56 +171,56 @@ impl std::fmt::Display for ParseErrorType {
                 )
             }
 
-            ParseErrorType::GlobalScope(token) => {
+            ParserErrorType::GlobalScope(token) => {
                 write!(f, "Unexpected token in global scope: {token}")
             }
 
-            ParseErrorType::TypeCast { from, to } => {
+            ParserErrorType::TypeCast { from, to } => {
                 write!(f, "Cannot cast `{from}` to `{to}`")
             }
 
-            ParseErrorType::RegexError => write!(f, "Regex syntax not supported"),
+            ParserErrorType::RegexError => write!(f, "Regex syntax not supported"),
 
-            ParseErrorType::IdentifierNotDefined(identifier) => {
+            ParserErrorType::IdentifierNotDefined(identifier) => {
                 write!(f, "Identifier `{identifier}` not defined")
             }
-            ParseErrorType::ConstantReassignment(constant) => {
+            ParserErrorType::ConstantReassignment(constant) => {
                 write!(f, "Cannot reassign constant `{}`", constant.name)
             }
-            ParseErrorType::VaribleTypeAnnotation => {
+            ParserErrorType::VaribleTypeAnnotation => {
                 write!(f, "Type annotations are required")
             }
 
-            ParseErrorType::None => write!(f, ""),
+            ParserErrorType::None => write!(f, ""),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct ParseError {
-    pub r#type: ParseErrorType,
+pub struct ParserError {
+    pub r#type: ParserErrorType,
     token: Token,
 }
 
-impl ParseError {
-    pub fn new(r#type: ParseErrorType, token: Token) -> ParseError {
-        ParseError { r#type, token }
+impl ParserError {
+    pub fn new(r#type: ParserErrorType, token: Token) -> ParserError {
+        ParserError { r#type, token }
     }
 
-    pub fn none() -> ParseError {
-        ParseError {
-            r#type: ParseErrorType::None,
+    pub fn none() -> ParserError {
+        ParserError {
+            r#type: ParserErrorType::None,
             token: Token::none(),
         }
     }
 
     pub fn print(&self) {
-        if self.r#type == ParseErrorType::None {
+        if self.r#type == ParserErrorType::None {
             return;
         }
 
         match &self.r#type {
-            ParseErrorType::MismatchedTokenType {
+            ParserErrorType::MismatchedTokenType {
                 expected: TokenType::Semicolon,
                 actual: _actual,
             } => match &self.token.last_token {
@@ -254,7 +254,7 @@ impl ParseError {
                     )
                 }
             },
-            ParseErrorType::ConstantReassignment(var) => {
+            ParserErrorType::ConstantReassignment(var) => {
                 eprintln!(
                     "{}{}              \n\
                      In: {}:{}:{}      \n\
@@ -271,7 +271,7 @@ impl ParseError {
                 )
             }
 
-            ParseErrorType::VaribleTypeAnnotation => eprintln!(
+            ParserErrorType::VaribleTypeAnnotation => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n\
@@ -302,7 +302,7 @@ impl ParseError {
     }
 }
 
-pub enum ParseWarningType<'a> {
+pub enum ParserWarningType<'a> {
     TrailingSemicolon,
     EmptyBlock,
 
@@ -321,40 +321,40 @@ pub enum ParseWarningType<'a> {
     MagicLiteral(Type),
 }
 
-pub struct ParseWarning<'a> {
-    pub r#type: ParseWarningType<'a>,
+pub struct ParserWarning<'a> {
+    pub r#type: ParserWarningType<'a>,
     pub token: Token,
 }
 
-impl std::fmt::Display for ParseWarningType<'_> {
+impl std::fmt::Display for ParserWarningType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
-            ParseWarningType::EmptyBlock => write!(f, "Empty block"),
-            ParseWarningType::UnusedValue => write!(f, "Unused value"),
-            ParseWarningType::UnusedVariable => write!(f, "Unused variable"),
-            ParseWarningType::VariableNotRead => {
+            ParserWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
+            ParserWarningType::EmptyBlock => write!(f, "Empty block"),
+            ParserWarningType::UnusedValue => write!(f, "Unused value"),
+            ParserWarningType::UnusedVariable => write!(f, "Unused variable"),
+            ParserWarningType::VariableNotRead => {
                 write!(f, "Variable is not read after assignment")
             }
-            ParseWarningType::VariableNeverReAssigned => {
+            ParserWarningType::VariableNeverReAssigned => {
                 write!(f, "Variable is never reassigned")
             }
-            ParseWarningType::ConstantNotUpperCase(_identifier) => {
+            ParserWarningType::ConstantNotUpperCase(_identifier) => {
                 write!(f, "Constants should be in UPPER_SNAKE_CASE")
             }
-            ParseWarningType::VariableNotSnakeCase(_identifier) => {
+            ParserWarningType::VariableNotSnakeCase(_identifier) => {
                 write!(f, "Variables should be in snake_case")
             }
-            ParseWarningType::SelfAssignment => write!(f, "Assignment without effect"),
-            ParseWarningType::NoBlock(_) => write!(f, "A block should be used here"),
-            ParseWarningType::MagicLiteral(r#type) => write!(f, "Magic {type} detected"),
+            ParserWarningType::SelfAssignment => write!(f, "Assignment without effect"),
+            ParserWarningType::NoBlock(_) => write!(f, "A block should be used here"),
+            ParserWarningType::MagicLiteral(r#type) => write!(f, "Magic {type} detected"),
         }
     }
 }
 
-impl ParseWarning<'_> {
-    pub fn new(r#type: ParseWarningType, token: Token) -> ParseWarning {
-        ParseWarning { r#type, token }
+impl ParserWarning<'_> {
+    pub fn new(r#type: ParserWarningType, token: Token) -> ParserWarning {
+        ParserWarning { r#type, token }
     }
 
     pub fn print(&self, disable_warnings: bool) {
@@ -362,7 +362,7 @@ impl ParseWarning<'_> {
             return;
         }
         match &self.r#type {
-            ParseWarningType::TrailingSemicolon => eprintln!(
+            ParserWarningType::TrailingSemicolon => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",
@@ -374,7 +374,7 @@ impl ParseWarning<'_> {
                 self.token.as_string(PrintStyle::Warning),
                 "remove this semicolon".bright_yellow(),
             ),
-            ParseWarningType::EmptyBlock => eprintln!(
+            ParserWarningType::EmptyBlock => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",
@@ -386,7 +386,7 @@ impl ParseWarning<'_> {
                 self.token.as_string(PrintStyle::Warning),
                 "remove this block".bright_yellow(),
             ),
-            ParseWarningType::UnusedValue => eprintln!(
+            ParserWarningType::UnusedValue => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n",
@@ -397,7 +397,7 @@ impl ParseWarning<'_> {
                 self.token.column,
                 self.token.as_string(PrintStyle::Warning),
             ),
-            ParseWarningType::UnusedVariable => eprintln!(
+            ParserWarningType::UnusedVariable => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",
@@ -409,7 +409,7 @@ impl ParseWarning<'_> {
                 self.token.as_string(PrintStyle::Warning),
                 "prefix with `_` to suppress this warning".bright_yellow(),
             ),
-            ParseWarningType::VariableNotRead => eprintln!(
+            ParserWarningType::VariableNotRead => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n",
@@ -420,7 +420,7 @@ impl ParseWarning<'_> {
                 self.token.column,
                 self.token.as_string(PrintStyle::Warning),
             ),
-            ParseWarningType::VariableNeverReAssigned => eprintln!(
+            ParserWarningType::VariableNeverReAssigned => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",
@@ -432,7 +432,7 @@ impl ParseWarning<'_> {
                 self.token.as_string(PrintStyle::Warning),
                 "consider changing to `const`".bright_yellow(),
             ),
-            ParseWarningType::ConstantNotUpperCase(identifier) => {
+            ParserWarningType::ConstantNotUpperCase(identifier) => {
                 let new_name = identifier.to_upper_snake_case();
                 eprintln!(
                     "{}{}              \n\
@@ -447,7 +447,7 @@ impl ParseWarning<'_> {
                     format!("consider changing the name to {new_name}").bright_yellow(),
                 )
             }
-            ParseWarningType::VariableNotSnakeCase(identifier) => {
+            ParserWarningType::VariableNotSnakeCase(identifier) => {
                 let new_name = identifier.to_snake_case();
                 eprintln!(
                     "{}{}              \n\
@@ -462,7 +462,7 @@ impl ParseWarning<'_> {
                     format!("consider changing the name to {new_name}").bright_yellow(),
                 )
             }
-            ParseWarningType::SelfAssignment => eprintln!(
+            ParserWarningType::SelfAssignment => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {}                \n",
@@ -473,7 +473,7 @@ impl ParseWarning<'_> {
                 self.token.column,
                 self.token.as_string(PrintStyle::Warning),
             ),
-            ParseWarningType::NoBlock(token) => match &self.token.last_token {
+            ParserWarningType::NoBlock(token) => match &self.token.last_token {
                 Some(last_token) => {
                     eprintln!(
                         "{}{}              \n\
@@ -489,7 +489,7 @@ impl ParseWarning<'_> {
                 }
                 _ => unreachable!(),
             },
-            ParseWarningType::MagicLiteral(_type) => eprintln!(
+            ParserWarningType::MagicLiteral(_type) => eprintln!(
                 "{}{}              \n\
                  In: {}:{}:{}      \n\
                  {} {}             \n",

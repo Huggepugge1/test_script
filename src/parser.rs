@@ -1,34 +1,37 @@
-use crate::cli::Args;
-use crate::environment::ParseEnvironment;
-use crate::error::{ParseError, ParseErrorType, ParseWarning, ParseWarningType};
-use crate::instruction::assignment::iterable_assignment::IterableAssignment;
-use crate::instruction::assignment::Assignment;
-use crate::instruction::binary_operation::{BinaryOperation, BinaryOperator};
-use crate::instruction::block::Block;
-use crate::instruction::boolean::BooleanLiteral;
-use crate::instruction::builtin::BuiltIn;
-use crate::instruction::conditional::Conditional;
-use crate::instruction::float::FloatLiteral;
-use crate::instruction::function::Function;
-use crate::instruction::function_call::FunctionCall;
-use crate::instruction::integer::IntegerLiteral;
-use crate::instruction::paren::Paren;
-use crate::instruction::r#for::For;
-use crate::instruction::regex::RegexLiteral;
-use crate::instruction::string::StringLiteral;
-use crate::instruction::test::TestInstruction;
-use crate::instruction::type_cast::TypeCast;
-use crate::instruction::unary_operation::{UnaryOperation, UnaryOperator};
-use crate::instruction::variable::{SnakeCase, Variable};
-use crate::instruction::{Instruction, InstructionType};
-use crate::r#type::Type;
-use crate::regex;
-use crate::token::{Token, TokenCollection, TokenType};
-use crate::white_listed_constants;
+use crate::{
+    cli::Args,
+    environment::ParserEnvironment,
+    error::{ParserError, ParserErrorType, ParserWarning, ParserWarningType},
+    instruction::{
+        assignment::{iterable_assignment::IterableAssignment, Assignment},
+        binary_operation::{BinaryOperation, BinaryOperator},
+        block::Block,
+        boolean::BooleanLiteral,
+        builtin::BuiltIn,
+        conditional::Conditional,
+        float::FloatLiteral,
+        function::Function,
+        function_call::FunctionCall,
+        integer::IntegerLiteral,
+        paren::Paren,
+        r#for::For,
+        regex::RegexLiteral,
+        string::StringLiteral,
+        test::TestInstruction,
+        type_cast::TypeCast,
+        unary_operation::{UnaryOperation, UnaryOperator},
+        variable::{SnakeCase, Variable},
+        Instruction, InstructionType,
+    },
+    r#type::Type,
+    regex,
+    token::{Token, TokenCollection, TokenType},
+    white_listed_constants,
+};
 
 pub struct Parser {
     tokens: TokenCollection,
-    environment: ParseEnvironment,
+    environment: ParserEnvironment,
     args: Args,
     in_constant_declaration: bool,
     success: bool,
@@ -38,7 +41,7 @@ impl Parser {
     pub fn new(tokens: TokenCollection, args: Args) -> Self {
         Self {
             tokens,
-            environment: ParseEnvironment::new(args.clone()),
+            environment: ParserEnvironment::new(args.clone()),
             args,
             in_constant_declaration: false,
             success: true,
@@ -56,24 +59,24 @@ impl Parser {
                     "fn" => self.parse_function(),
                     _ => {
                         self.tokens.advance_to_next_instruction();
-                        Err(ParseError::new(
-                            ParseErrorType::GlobalScope(token.clone().r#type),
+                        Err(ParserError::new(
+                            ParserErrorType::GlobalScope(token.clone().r#type),
                             token,
                         ))
                     }
                 },
                 TokenType::OpenBlock | TokenType::CloseBlock => {
                     self.tokens.next();
-                    Err(ParseError::new(
-                        ParseErrorType::GlobalScope(token.clone().r#type),
+                    Err(ParserError::new(
+                        ParserErrorType::GlobalScope(token.clone().r#type),
                         token.clone(),
                     ))
                 }
 
                 r#type => {
                     self.tokens.advance_to_next_instruction();
-                    Err(ParseError::new(
-                        ParseErrorType::GlobalScope(r#type),
+                    Err(ParserError::new(
+                        ParserErrorType::GlobalScope(r#type),
                         token.clone(),
                     ))
                 }
@@ -91,7 +94,7 @@ impl Parser {
         }
     }
 
-    fn parse_statement(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_statement(&mut self) -> Result<Instruction, ParserError> {
         let instruction = self.parse_expression(true, true)?;
         match self.end_statement() {
             Ok(_) => (),
@@ -108,7 +111,7 @@ impl Parser {
         &mut self,
         parse_binary: bool,
         parse_type_cast: bool,
-    ) -> Result<Instruction, ParseError> {
+    ) -> Result<Instruction, ParserError> {
         let mut token = self.peek_next_token()?;
         let mut instruction = match &token.r#type {
             TokenType::StringLiteral { .. } => self.parse_string_literal()?,
@@ -130,8 +133,8 @@ impl Parser {
                 "-" => self.parse_unary_operator()?,
                 _ => {
                     self.tokens.advance_to_next_instruction();
-                    Err(ParseError::new(
-                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                    Err(ParserError::new(
+                        ParserErrorType::UnexpectedToken(token.r#type.clone()),
                         token.clone(),
                     ))?
                 }
@@ -140,8 +143,8 @@ impl Parser {
             TokenType::Semicolon => Instruction::new(InstructionType::None, token.clone()),
             token_type => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken(token_type.clone()),
+                return Err(ParserError::new(
+                    ParserErrorType::UnexpectedToken(token_type.clone()),
                     token.clone(),
                 ));
             }
@@ -167,7 +170,7 @@ impl Parser {
         Ok(instruction)
     }
 
-    fn parse_test(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_test(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let name = match &token.r#type {
             TokenType::Identifier { value } => value,
@@ -194,13 +197,13 @@ impl Parser {
         ))
     }
 
-    fn parse_function(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_function(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let name = self.get_next_token()?;
         let name = match &name.r#type {
             TokenType::Identifier { value } => value,
-            r#type => Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType {
+            r#type => Err(ParserError::new(
+                ParserErrorType::MismatchedTokenType {
                     expected: TokenType::Identifier {
                         value: String::new(),
                     },
@@ -223,8 +226,8 @@ impl Parser {
             } => value,
             return_type => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
                         actual: return_type.r#type.clone(),
                     },
@@ -250,7 +253,7 @@ impl Parser {
         Ok(Instruction::new(InstructionType::Function(function), token))
     }
 
-    fn parse_parameters(&mut self) -> Result<Vec<Variable>, ParseError> {
+    fn parse_parameters(&mut self) -> Result<Vec<Variable>, ParserError> {
         let mut arguments = Vec::new();
         let mut r#const = false;
         while let Some(token) = self.tokens.peek() {
@@ -261,8 +264,8 @@ impl Parser {
                 TokenType::Keyword { ref value } => {
                     if value != "const" {
                         self.tokens.advance_to_next_instruction();
-                        return Err(ParseError::new(
-                            ParseErrorType::MismatchedTokenType {
+                        return Err(ParserError::new(
+                            ParserErrorType::MismatchedTokenType {
                                 expected: TokenType::Identifier {
                                     value: String::new(),
                                 },
@@ -285,8 +288,8 @@ impl Parser {
                         }
                         _ => {
                             self.tokens.advance_to_next_instruction();
-                            return Err(ParseError::new(
-                                ParseErrorType::MismatchedTokenType {
+                            return Err(ParserError::new(
+                                ParserErrorType::MismatchedTokenType {
                                     expected: TokenType::Comma,
                                     actual: self.peek_next_token()?.r#type,
                                 },
@@ -297,8 +300,8 @@ impl Parser {
                 }
                 _ => {
                     self.tokens.advance_to_next_instruction();
-                    return Err(ParseError::new(
-                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                    return Err(ParserError::new(
+                        ParserErrorType::UnexpectedToken(token.r#type.clone()),
                         token.clone(),
                     ));
                 }
@@ -307,12 +310,12 @@ impl Parser {
         Ok(arguments)
     }
 
-    fn parse_parameter(&mut self, r#const: bool) -> Result<Variable, ParseError> {
+    fn parse_parameter(&mut self, r#const: bool) -> Result<Variable, ParserError> {
         let token = self.get_next_token()?;
         let name = match &token.r#type {
             TokenType::Identifier { value } => value,
-            _ => Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType {
+            _ => Err(ParserError::new(
+                ParserErrorType::MismatchedTokenType {
                     expected: TokenType::Identifier {
                         value: String::new(),
                     },
@@ -332,8 +335,8 @@ impl Parser {
             } => value.clone(),
             token => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
                         actual: token.r#type.clone(),
                     },
@@ -356,7 +359,7 @@ impl Parser {
         })
     }
 
-    fn parse_arguments(&mut self) -> Result<Vec<Instruction>, ParseError> {
+    fn parse_arguments(&mut self) -> Result<Vec<Instruction>, ParserError> {
         let mut arguments = Vec::new();
         while let Some(token) = self.tokens.peek() {
             match token.r#type {
@@ -375,8 +378,8 @@ impl Parser {
                         }
                         _ => {
                             self.tokens.advance_to_next_instruction();
-                            return Err(ParseError::new(
-                                ParseErrorType::MismatchedTokenType {
+                            return Err(ParserError::new(
+                                ParserErrorType::MismatchedTokenType {
                                     expected: TokenType::Comma,
                                     actual: self.peek_next_token()?.r#type,
                                 },
@@ -390,7 +393,7 @@ impl Parser {
         Ok(arguments)
     }
 
-    fn parse_string_literal(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_string_literal(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
 
         match &token.r#type {
@@ -406,7 +409,7 @@ impl Parser {
         }
     }
 
-    fn parse_unary_operator(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_unary_operator(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let operator = match &token.r#type {
             TokenType::UnaryOperator { value } => match value.as_str() {
@@ -425,7 +428,7 @@ impl Parser {
         Ok(Instruction::new(
             InstructionType::UnaryOperation(UnaryOperation {
                 operator,
-                instruction: Box::new(instruction),
+                body: Box::new(instruction),
             }),
             token,
         ))
@@ -434,7 +437,7 @@ impl Parser {
     fn parse_binary_operator(
         &mut self,
         instruction: Instruction,
-    ) -> Result<Instruction, ParseError> {
+    ) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let new_operator = match &token.r#type {
             TokenType::BinaryOperator { value } => match value.as_str() {
@@ -462,8 +465,8 @@ impl Parser {
             ..
         } = new_right
         {
-            return Err(ParseError::new(
-                ParseErrorType::UnexpectedToken(TokenType::Semicolon),
+            return Err(ParserError::new(
+                ParserErrorType::UnexpectedToken(TokenType::Semicolon),
                 token.clone(),
             ));
         }
@@ -507,7 +510,7 @@ impl Parser {
         }
     }
 
-    fn parse_type_cast(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
+    fn parse_type_cast(&mut self, instruction: &Instruction) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let to = match self.get_next_token()? {
             Token {
@@ -516,8 +519,8 @@ impl Parser {
             } => value,
             _ => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
                         actual: token.clone().r#type,
                     },
@@ -534,7 +537,7 @@ impl Parser {
         ))
     }
 
-    fn parse_regex_literal(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_regex_literal(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         match &token.r#type {
             TokenType::RegexLiteral { .. } => Ok(Instruction::new(
@@ -547,7 +550,7 @@ impl Parser {
         }
     }
 
-    fn parse_integer_literal(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_integer_literal(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         match token.r#type {
             TokenType::IntegerLiteral { value } => {
@@ -556,7 +559,7 @@ impl Parser {
                     && !white_listed_constants::INTEGERS.contains(&value)
                     && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Int), token.clone())
+                    ParserWarning::new(ParserWarningType::MagicLiteral(Type::Int), token.clone())
                         .print(self.args.disable_warnings)
                 }
                 Ok(Instruction::new(
@@ -568,7 +571,7 @@ impl Parser {
         }
     }
 
-    fn parse_float_literal(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_float_literal(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         match token.r#type {
             TokenType::FloatLiteral { value } => {
@@ -577,7 +580,7 @@ impl Parser {
                     && !white_listed_constants::FLOATS.contains(&value)
                     && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Float), token.clone())
+                    ParserWarning::new(ParserWarningType::MagicLiteral(Type::Float), token.clone())
                         .print(self.args.disable_warnings)
                 }
                 Ok(Instruction::new(
@@ -589,7 +592,7 @@ impl Parser {
         }
     }
 
-    fn parse_boolean_literal(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_boolean_literal(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         match token.r#type {
             TokenType::BooleanLiteral { value } => {
@@ -598,7 +601,7 @@ impl Parser {
                     && !white_listed_constants::BOOLS.contains(&value)
                     && !self.args.disable_style_warnings
                 {
-                    ParseWarning::new(ParseWarningType::MagicLiteral(Type::Bool), token.clone())
+                    ParserWarning::new(ParserWarningType::MagicLiteral(Type::Bool), token.clone())
                         .print(self.args.disable_warnings)
                 }
                 Ok(Instruction::new(
@@ -610,7 +613,7 @@ impl Parser {
         }
     }
 
-    fn parse_keyword(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_keyword(&mut self) -> Result<Instruction, ParserError> {
         let token = self.peek_next_token()?;
         match &token.r#type {
             TokenType::Keyword { value } => match value.as_str() {
@@ -620,8 +623,8 @@ impl Parser {
                 "if" => self.parse_conditional(),
                 _ => {
                     self.tokens.advance_to_next_instruction();
-                    Err(ParseError::new(
-                        ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                    Err(ParserError::new(
+                        ParserErrorType::UnexpectedToken(token.r#type.clone()),
                         token.clone(),
                     ))
                 }
@@ -630,7 +633,7 @@ impl Parser {
         }
     }
 
-    fn parse_declaration(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_declaration(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let r#const = match &token.r#type {
             TokenType::Keyword { value } => value == "const",
@@ -643,8 +646,8 @@ impl Parser {
                 match r#const {
                     false => {
                         if !self.args.disable_style_warnings && !value.is_snake_case() {
-                            ParseWarning::new(
-                                ParseWarningType::VariableNotSnakeCase(value.to_string()),
+                            ParserWarning::new(
+                                ParserWarningType::VariableNotSnakeCase(value.to_string()),
                                 identifier.clone(),
                             )
                             .print(self.args.disable_warnings)
@@ -653,8 +656,8 @@ impl Parser {
                     true => {
                         self.in_constant_declaration = true;
                         if !self.args.disable_style_warnings && !value.is_upper_snake_case() {
-                            ParseWarning::new(
-                                ParseWarningType::ConstantNotUpperCase(value.to_string()),
+                            ParserWarning::new(
+                                ParserWarningType::ConstantNotUpperCase(value.to_string()),
                                 identifier.clone(),
                             )
                             .print(self.args.disable_warnings)
@@ -666,8 +669,8 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 self.in_constant_declaration = false;
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Identifier {
                             value: String::new(),
                         },
@@ -698,8 +701,8 @@ impl Parser {
                 self.environment.insert(variable.clone());
 
                 self.in_constant_declaration = false;
-                return Err(ParseError::new(
-                    ParseErrorType::VaribleTypeAnnotation,
+                return Err(ParserError::new(
+                    ParserErrorType::VaribleTypeAnnotation,
                     identifier,
                 ));
             }
@@ -715,8 +718,8 @@ impl Parser {
             r#type => {
                 self.tokens.advance_to_next_instruction();
                 self.in_constant_declaration = false;
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Type { value: Type::Any },
                         actual: r#type.r#type.clone(),
                     },
@@ -731,8 +734,8 @@ impl Parser {
             _ => {
                 self.tokens.advance_to_next_instruction();
                 self.in_constant_declaration = false;
-                return Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                return Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::AssignmentOperator,
                         actual: assignment.r#type.clone(),
                     },
@@ -791,14 +794,14 @@ impl Parser {
         }
     }
 
-    fn parse_assignment(&mut self, instruction: &Instruction) -> Result<Instruction, ParseError> {
+    fn parse_assignment(&mut self, instruction: &Instruction) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let variable = match &instruction.r#type {
             InstructionType::Variable(variable) => variable,
             _ => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken(token.r#type.clone()),
+                return Err(ParserError::new(
+                    ParserErrorType::UnexpectedToken(token.r#type.clone()),
                     token.clone(),
                 ));
             }
@@ -806,16 +809,16 @@ impl Parser {
 
         if variable.r#const {
             self.tokens.advance_to_next_instruction();
-            return Err(ParseError::new(
-                ParseErrorType::ConstantReassignment(variable.clone()),
+            return Err(ParserError::new(
+                ParserErrorType::ConstantReassignment(variable.clone()),
                 instruction.token.clone(),
             ));
         }
 
         if token.r#type != TokenType::AssignmentOperator {
             self.tokens.advance_to_next_instruction();
-            return Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType {
+            return Err(ParserError::new(
+                ParserErrorType::MismatchedTokenType {
                     expected: TokenType::AssignmentOperator,
                     actual: token.clone().r#type,
                 },
@@ -826,15 +829,15 @@ impl Parser {
         let instruction = self.parse_expression(true, true)?;
         if self.environment.get(&variable.name).is_none() {
             self.tokens.advance_to_next_instruction();
-            return Err(ParseError::new(
-                ParseErrorType::IdentifierNotDefined(variable.name.clone()),
+            return Err(ParserError::new(
+                ParserErrorType::IdentifierNotDefined(variable.name.clone()),
                 token.clone(),
             ));
         }
 
         if let InstructionType::Variable(ref instruction_variable) = instruction.r#type {
             if variable.name == instruction_variable.name {
-                ParseWarning::new(ParseWarningType::SelfAssignment, instruction.token.clone())
+                ParserWarning::new(ParserWarningType::SelfAssignment, instruction.token.clone())
                     .print(self.args.disable_warnings);
             }
         }
@@ -850,7 +853,7 @@ impl Parser {
         ))
     }
 
-    fn parse_identifier(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_identifier(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         match &token.r#type {
             TokenType::Identifier { value } => {
@@ -858,8 +861,8 @@ impl Parser {
                 let function = self.environment.get_function(value);
                 if variable.is_none() && function.is_none() {
                     self.tokens.advance_to_next_instruction();
-                    Err(ParseError::new(
-                        ParseErrorType::IdentifierNotDefined(value.clone()),
+                    Err(ParserError::new(
+                        ParserErrorType::IdentifierNotDefined(value.clone()),
                         token.clone(),
                     ))
                 } else if function.is_some() {
@@ -884,7 +887,7 @@ impl Parser {
         }
     }
 
-    fn parse_builtin(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_builtin(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         self.expect_token(TokenType::OpenParen)?;
         let arguments = self.parse_arguments()?;
@@ -902,7 +905,7 @@ impl Parser {
         }
     }
 
-    fn parse_block(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_block(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let mut statements = Vec::new();
         self.environment.add_scope();
@@ -921,8 +924,8 @@ impl Parser {
                 Ok(token) => token,
                 Err(_) => {
                     self.tokens.advance_to_next_instruction();
-                    return Err(ParseError::new(
-                        ParseErrorType::UnclosedDelimiter(TokenType::OpenBlock),
+                    return Err(ParserError::new(
+                        ParserErrorType::UnclosedDelimiter(TokenType::OpenBlock),
                         token,
                     ));
                 }
@@ -931,7 +934,7 @@ impl Parser {
 
         self.environment.remove_scope();
         if statements.is_empty() {
-            ParseWarning::new(ParseWarningType::EmptyBlock, token.clone())
+            ParserWarning::new(ParserWarningType::EmptyBlock, token.clone())
                 .print(self.args.disable_warnings)
         }
         Ok(Instruction::new(
@@ -940,7 +943,7 @@ impl Parser {
         ))
     }
 
-    fn parse_conditional(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_conditional(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let condition = self.parse_expression(true, true)?;
         let r#if = self.parse_statement()?;
@@ -948,13 +951,13 @@ impl Parser {
             InstructionType::Block(_) => (),
             InstructionType::None => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
+                return Err(ParserError::new(
+                    ParserErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
                     self.tokens.current().unwrap(),
                 ));
             }
-            _ => ParseWarning::new(
-                ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
+            _ => ParserWarning::new(
+                ParserWarningType::NoBlock(&self.tokens.current().unwrap()),
                 r#if.token.clone(),
             )
             .print(self.args.disable_warnings || self.args.disable_style_warnings),
@@ -981,8 +984,8 @@ impl Parser {
         match r#else.r#type {
             InstructionType::Block(_) => (),
             InstructionType::None => (),
-            _ => ParseWarning::new(
-                ParseWarningType::NoBlock(&self.tokens.peek().unwrap()),
+            _ => ParserWarning::new(
+                ParserWarningType::NoBlock(&self.tokens.peek().unwrap()),
                 r#else.token.clone(),
             )
             .print(self.args.disable_warnings || self.args.disable_style_warnings),
@@ -998,7 +1001,7 @@ impl Parser {
         ))
     }
 
-    fn parse_for(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_for(&mut self) -> Result<Instruction, ParserError> {
         let token = self.peek_next_token()?;
 
         self.environment.add_scope();
@@ -1010,8 +1013,8 @@ impl Parser {
                 }
                 _ => {
                     self.tokens.advance_to_next_instruction();
-                    return Err(ParseError::new(
-                        ParseErrorType::MismatchedInstruction {
+                    return Err(ParserError::new(
+                        ParserErrorType::MismatchedInstruction {
                             expected: vec![Instruction {
                                 r#type: InstructionType::IterableAssignment(IterableAssignment {
                                     variable: Variable {
@@ -1054,13 +1057,13 @@ impl Parser {
             InstructionType::Block(_) => (),
             InstructionType::None => {
                 self.tokens.advance_to_next_instruction();
-                return Err(ParseError::new(
-                    ParseErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
+                return Err(ParserError::new(
+                    ParserErrorType::UnexpectedToken(self.tokens.current().unwrap().r#type),
                     self.tokens.current().unwrap(),
                 ));
             }
-            _ => ParseWarning::new(
-                ParseWarningType::NoBlock(&self.tokens.current().unwrap()),
+            _ => ParserWarning::new(
+                ParserWarningType::NoBlock(&self.tokens.current().unwrap()),
                 body.token.clone(),
             )
             .print(self.args.disable_warnings || self.args.disable_style_warnings),
@@ -1079,7 +1082,7 @@ impl Parser {
         }
     }
 
-    fn parse_parentheses(&mut self) -> Result<Instruction, ParseError> {
+    fn parse_parentheses(&mut self) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
         let instruction = self.parse_expression(true, true)?;
         self.expect_token(TokenType::CloseParen)?;
@@ -1091,12 +1094,12 @@ impl Parser {
         ))
     }
 
-    fn expect_token(&mut self, expected: TokenType) -> Result<(), ParseError> {
+    fn expect_token(&mut self, expected: TokenType) -> Result<(), ParserError> {
         let token = self.get_next_token()?;
         if token.r#type != expected {
             self.tokens.advance_to_next_instruction();
-            Err(ParseError::new(
-                ParseErrorType::MismatchedTokenType {
+            Err(ParserError::new(
+                ParserErrorType::MismatchedTokenType {
                     expected,
                     actual: token.clone().r#type,
                 },
@@ -1107,14 +1110,14 @@ impl Parser {
         }
     }
 
-    fn end_statement(&mut self) -> Result<(), ParseError> {
+    fn end_statement(&mut self) -> Result<(), ParserError> {
         let token = self.get_next_token()?;
         match token.r#type {
             TokenType::Semicolon | TokenType::CloseBlock => Ok(()),
             _ => {
                 self.tokens.back();
-                Err(ParseError::new(
-                    ParseErrorType::MismatchedTokenType {
+                Err(ParserError::new(
+                    ParserErrorType::MismatchedTokenType {
                         expected: TokenType::Semicolon,
                         actual: token.clone().r#type,
                     },
@@ -1124,23 +1127,23 @@ impl Parser {
         }
     }
 
-    fn get_next_token(&mut self) -> Result<Token, ParseError> {
+    fn get_next_token(&mut self) -> Result<Token, ParserError> {
         if let Some(token) = self.tokens.next() {
             Ok(token)
         } else {
-            Err(ParseError::new(
-                ParseErrorType::UnexpectedEndOfFile,
+            Err(ParserError::new(
+                ParserErrorType::UnexpectedEndOfFile,
                 self.tokens.current().unwrap(),
             ))
         }
     }
 
-    fn peek_next_token(&mut self) -> Result<Token, ParseError> {
+    fn peek_next_token(&mut self) -> Result<Token, ParserError> {
         if let Some(token) = self.tokens.peek() {
             Ok(token)
         } else {
-            Err(ParseError::new(
-                ParseErrorType::UnexpectedEndOfFile,
+            Err(ParserError::new(
+                ParserErrorType::UnexpectedEndOfFile,
                 self.tokens.current().unwrap(),
             ))
         }

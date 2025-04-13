@@ -37,10 +37,12 @@ use type_cast::TypeCast;
 use unary_operation::UnaryOperation;
 use variable::Variable;
 
-use crate::environment::Environment;
-use crate::error::InterpreterError;
+use crate::environment::{Environment, ParserEnvironment};
+use crate::error::{InterpreterError, ParserError, ParserWarning, ParserWarningType};
 use crate::process::Process;
+use crate::r#type::Type;
 use crate::token::{Token, TokenType};
+use crate::type_checker::TypeCheck;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionResult {
@@ -131,18 +133,8 @@ impl Instruction {
         Self { r#type, token }
     }
 
-    pub fn inner_most(&self) -> &Self {
-        match &self.r#type {
-            InstructionType::Block(ref block) => {
-                if block.statements.is_empty() {
-                    self
-                } else {
-                    block.statements.last().unwrap().inner_most()
-                }
-            }
-            InstructionType::Paren(ref paren) => paren.expression.inner_most(),
-            _ => self,
-        }
+    pub fn type_check(&self, environment: &mut ParserEnvironment) -> Result<Type, ParserError> {
+        self.r#type.type_check(environment, &self.token)
     }
 
     pub fn interpret(
@@ -229,4 +221,58 @@ pub enum InstructionType {
     TypeCast(TypeCast),
 
     None,
+}
+
+impl TypeCheck for InstructionType {
+    fn type_check(
+        &self,
+        environment: &mut ParserEnvironment,
+        token: &Token,
+    ) -> Result<Type, ParserError> {
+        match self {
+            InstructionType::StringLiteral(string) => string.type_check(environment, token),
+            InstructionType::RegexLiteral(regex) => regex.type_check(environment, token),
+            InstructionType::IntegerLiteral(integer) => integer.type_check(environment, token),
+            InstructionType::FloatLiteral(float) => float.type_check(environment, token),
+            InstructionType::BooleanLiteral(boolean) => boolean.type_check(environment, token),
+
+            InstructionType::BuiltIn(built_in) => built_in.type_check(environment, token),
+
+            InstructionType::Block(block) => block.type_check(environment, token),
+            InstructionType::Paren(paren) => paren.type_check(environment, token),
+
+            InstructionType::Test(test) => test.type_check(environment, token),
+            InstructionType::Function(function) => function.type_check(environment, token),
+
+            InstructionType::For(r#for) => r#for.type_check(environment, token),
+
+            InstructionType::Conditional(conditional) => conditional.type_check(environment, token),
+
+            InstructionType::Assignment(assignment) => assignment.type_check(environment, token),
+            InstructionType::IterableAssignment(iterable_assignment) => {
+                iterable_assignment.type_check(environment, token)
+            }
+
+            InstructionType::Variable(variable) => variable.type_check(environment, token),
+
+            InstructionType::FunctionCall(function_call) => {
+                function_call.type_check(environment, token)
+            }
+
+            InstructionType::UnaryOperation(unary_operation) => {
+                unary_operation.type_check(environment, token)
+            }
+            InstructionType::BinaryOperation(binary_operation) => {
+                binary_operation.type_check(environment, token)
+            }
+
+            InstructionType::TypeCast(type_cast) => type_cast.type_check(environment, token),
+
+            InstructionType::None => {
+                ParserWarning::new(ParserWarningType::TrailingSemicolon, token.clone())
+                    .print(environment.args.disable_warnings);
+                Ok(Type::None)
+            }
+        }
+    }
 }
