@@ -1,6 +1,7 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError, ParserErrorType},
+    error::{InterpreterError, ParserMessage},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
     token::Token,
@@ -35,37 +36,34 @@ impl TypeCheck for FunctionCall {
         &self,
         environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         let function = environment.get_function(&self.name).unwrap().clone();
         if function.parameters.len() != self.arguments.len() {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedNumberOfArguments {
-                    expected: function.parameters.len(),
-                    actual: self.arguments.len(),
-                },
+            messages.push(ParserMessage::error_mismatched_number_of_arguments(
+                function.parameters.len(),
+                self.arguments.len(),
                 token.clone(),
             ));
         }
 
         for (parameter, argument) in function.parameters.iter().zip(&self.arguments) {
-            let argument_type = argument.type_check(environment)?;
+            let argument_type = argument.type_check(environment, token, messages);
             if parameter.r#type != argument_type {
-                return Err(ParserError::new(
-                    ParserErrorType::MismatchedType {
-                        expected: vec![parameter.r#type.clone()],
-                        actual: argument_type,
-                    },
-                    argument.token.clone(),
+                messages.push(ParserMessage::error_mismatched_type(
+                    vec![parameter.r#type.clone()],
+                    argument_type,
+                    token.clone(),
                 ));
             }
         }
 
-        Ok(function.return_type)
+        function.return_type
     }
 }
 
-impl FunctionCall {
-    pub fn interpret(
+impl Interpret for FunctionCall {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

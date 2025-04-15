@@ -1,5 +1,6 @@
 use crate::{
-    environment::ParserEnvironment, error::ParserError, r#type::Type, type_checker::TypeCheck,
+    environment::ParserEnvironment, error::ParserMessage, r#type::Type, token::Token,
+    type_checker::TypeCheck,
 };
 
 use super::InstructionResult;
@@ -19,9 +20,10 @@ impl TypeCheck for FloatLiteral {
     fn type_check(
         &self,
         _environment: &mut ParserEnvironment,
-        _token: &crate::token::Token,
-    ) -> Result<Type, ParserError> {
-        Ok(Type::Float)
+        _token: &Token,
+        _messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        Type::Float
     }
 }
 

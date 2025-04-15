@@ -2,8 +2,9 @@ pub mod iterable_assignment;
 
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError, ParserErrorType},
+    error::{InterpreterError, ParserMessage},
     instruction::{variable::Variable, Instruction, InstructionResult},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
     token::Token,
@@ -29,16 +30,15 @@ impl TypeCheck for Assignment {
         &self,
         environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         let variable_type = self.variable.r#type.clone();
-        let body_type = self.body.type_check(environment)?;
+        let body_type = self.body.type_check(environment, token, messages);
 
         if variable_type != Type::Any && variable_type != body_type {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedType {
-                    expected: vec![variable_type],
-                    actual: body_type,
-                },
+            messages.push(ParserMessage::error_mismatched_type(
+                vec![variable_type],
+                body_type.clone(),
                 token.clone(),
             ));
         }
@@ -53,12 +53,12 @@ impl TypeCheck for Assignment {
         variable.assigned = true;
 
         environment.insert(variable);
-        Ok(Type::None)
+        Type::None
     }
 }
 
-impl Assignment {
-    pub fn interpret(
+impl Interpret for Assignment {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

@@ -1,7 +1,7 @@
 use crate::cli::Args;
 use crate::environment::Environment;
 use crate::error::InterpreterError;
-use crate::instruction::{Instruction, InstructionType};
+use crate::instruction::{Instruction, InstructionResult, InstructionType};
 use crate::process::Process;
 
 pub struct Test {
@@ -14,7 +14,7 @@ pub struct Test {
 impl Test {
     pub fn run(&mut self, environment: &mut Environment) {
         environment.add_frame();
-        let instruction = self.body.clone();
+        let instruction = &self.body;
         match instruction.interpret(environment, &mut Some(&mut self.process)) {
             Ok(_) => (),
             Err(e) => {
@@ -47,6 +47,14 @@ impl Test {
         error.print();
         let _ = self.process.terminate();
     }
+}
+
+pub trait Interpret {
+    fn interpret(
+        &self,
+        environment: &mut Environment,
+        process: &mut Option<&mut Process>,
+    ) -> Result<InstructionResult, InterpreterError>;
 }
 
 pub struct Interpreter {

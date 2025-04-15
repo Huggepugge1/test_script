@@ -1,8 +1,10 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::InterpreterError,
+    error::{InterpreterError, ParserError, ParserErrorType, ParserMessage},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
+    token::Token,
     type_checker::TypeCheck,
 };
 
@@ -24,24 +26,27 @@ impl TypeCheck for TypeCast {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        token: &crate::token::Token,
-    ) -> Result<Type, crate::error::ParserError> {
-        let from_type = self.from.type_check(environment)?;
+        token: &Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        let from_type = self.from.type_check(environment, token, messages);
         if !from_type.can_cast_to(&self.to) {
-            return Err(crate::error::ParserError::new(
-                crate::error::ParserErrorType::TypeCast {
+            messages.push(ParserMessage::Error(ParserError::new(
+                ParserErrorType::TypeCast {
                     from: from_type,
                     to: self.to.clone(),
                 },
                 token.clone(),
-            ));
+            )));
+            Type::None
+        } else {
+            self.to.clone()
         }
-        Ok(self.to.clone())
     }
 }
 
-impl TypeCast {
-    pub fn interpret(
+impl Interpret for TypeCast {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,
@@ -54,7 +59,9 @@ impl TypeCast {
             _ => unreachable!(),
         }
     }
+}
 
+impl TypeCast {
     fn cast_to_string(
         &self,
         environtment: &mut Environment,

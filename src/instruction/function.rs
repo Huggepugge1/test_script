@@ -1,6 +1,6 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError},
+    error::{InterpreterError, ParserMessage},
     r#type::Type,
     token::Token,
     type_checker::TypeCheck,
@@ -34,14 +34,15 @@ impl TypeCheck for Function {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        _token: &Token,
-    ) -> Result<Type, ParserError> {
+        token: &Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         environment.add_function(self.clone());
         environment.add_scope();
         for parameter in &self.parameters {
             environment.insert(parameter.clone());
         }
-        let result = self.body.type_check(environment);
+        let result = self.body.type_check(environment, token, messages);
         environment.remove_scope();
         result
     }

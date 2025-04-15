@@ -4,7 +4,13 @@ use crate::{
     error::{ParserError, ParserErrorType, ParserWarning, ParserWarningType},
     instruction::{
         assignment::{iterable_assignment::IterableAssignment, Assignment},
-        binary_operation::{BinaryOperation, BinaryOperator},
+        binary::{
+            addition::Addition, and::And, division::Division, equality::Equality,
+            greater_than::GreaterThan, greater_than_or_equality::GreaterThanOrEquality,
+            less_than::LessThan, less_than_or_equality::LessThanOrEquality, modulo::Modulo,
+            multiplication::Multiplication, non_equality::NonEquality, or::Or,
+            subtraction::Subtraction, Binary, BinaryOperationTrait,
+        },
         block::Block,
         boolean::BooleanLiteral,
         builtin::BuiltIn,
@@ -19,7 +25,7 @@ use crate::{
         string::StringLiteral,
         test::TestInstruction,
         type_cast::TypeCast,
-        unary_operation::{UnaryOperation, UnaryOperator},
+        unary::{Unary, UnaryOperator},
         variable::{SnakeCase, Variable},
         Instruction, InstructionType,
     },
@@ -426,7 +432,7 @@ impl Parser {
 
         let instruction = self.parse_expression(false, false)?;
         Ok(Instruction::new(
-            InstructionType::UnaryOperation(UnaryOperation {
+            InstructionType::UnaryOperation(Unary {
                 operator,
                 body: Box::new(instruction),
             }),
@@ -439,21 +445,23 @@ impl Parser {
         instruction: Instruction,
     ) -> Result<Instruction, ParserError> {
         let token = self.get_next_token()?;
-        let new_operator = match &token.r#type {
+        let new_operator: Box<dyn BinaryOperationTrait> = match &token.r#type {
             TokenType::BinaryOperator { value } => match value.as_str() {
-                "+" => BinaryOperator::Addition,
-                "-" => BinaryOperator::Subtraction,
-                "*" => BinaryOperator::Multiplication,
-                "/" => BinaryOperator::Division,
-                "%" => BinaryOperator::Modulo,
-                "==" => BinaryOperator::Equal,
-                "!=" => BinaryOperator::NotEqual,
-                ">" => BinaryOperator::GreaterThan,
-                ">=" => BinaryOperator::GreaterThanOrEqual,
-                "<" => BinaryOperator::LessThan,
-                "<=" => BinaryOperator::LessThanOrEqual,
-                "&&" => BinaryOperator::And,
-                "||" => BinaryOperator::Or,
+                "&&" => Box::new(And) as Box<dyn BinaryOperationTrait>,
+                "||" => Box::new(Or) as Box<dyn BinaryOperationTrait>,
+
+                "==" => Box::new(Equality) as Box<dyn BinaryOperationTrait>,
+                "!=" => Box::new(NonEquality) as Box<dyn BinaryOperationTrait>,
+                ">" => Box::new(GreaterThan) as Box<dyn BinaryOperationTrait>,
+                ">=" => Box::new(GreaterThanOrEquality) as Box<dyn BinaryOperationTrait>,
+                "<" => Box::new(LessThan) as Box<dyn BinaryOperationTrait>,
+                "<=" => Box::new(LessThanOrEquality) as Box<dyn BinaryOperationTrait>,
+
+                "+" => Box::new(Addition) as Box<dyn BinaryOperationTrait>,
+                "-" => Box::new(Subtraction) as Box<dyn BinaryOperationTrait>,
+                "*" => Box::new(Multiplication) as Box<dyn BinaryOperationTrait>,
+                "/" => Box::new(Division) as Box<dyn BinaryOperationTrait>,
+                "%" => Box::new(Modulo) as Box<dyn BinaryOperationTrait>,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -472,23 +480,23 @@ impl Parser {
         }
 
         match instruction.r#type {
-            InstructionType::BinaryOperation(BinaryOperation {
+            InstructionType::BinaryOperation(Binary {
                 ref operator,
                 ref left,
                 ref right,
             }) => Ok(Instruction::new(
-                if new_operator <= *operator {
-                    InstructionType::BinaryOperation(BinaryOperation {
+                if &new_operator <= operator {
+                    InstructionType::BinaryOperation(Binary {
                         operator: new_operator,
                         left: Box::new(instruction.clone()),
                         right: Box::new(new_right),
                     })
                 } else {
-                    InstructionType::BinaryOperation(BinaryOperation {
+                    InstructionType::BinaryOperation(Binary {
                         operator: operator.clone(),
                         left: left.clone(),
                         right: Box::new(Instruction::new(
-                            InstructionType::BinaryOperation(BinaryOperation {
+                            InstructionType::BinaryOperation(Binary {
                                 operator: new_operator,
                                 left: right.clone(),
                                 right: Box::new(new_right),
@@ -500,7 +508,7 @@ impl Parser {
                 token,
             )),
             _ => Ok(Instruction::new(
-                InstructionType::BinaryOperation(BinaryOperation {
+                InstructionType::BinaryOperation(Binary {
                     operator: new_operator,
                     left: Box::new(instruction.clone()),
                     right: Box::new(new_right),
@@ -560,7 +568,7 @@ impl Parser {
                     && !self.args.disable_style_warnings
                 {
                     ParserWarning::new(ParserWarningType::MagicLiteral(Type::Int), token.clone())
-                        .print(self.args.disable_warnings)
+                        .print(&self.args)
                 }
                 Ok(Instruction::new(
                     InstructionType::IntegerLiteral(IntegerLiteral { value }),
@@ -581,7 +589,7 @@ impl Parser {
                     && !self.args.disable_style_warnings
                 {
                     ParserWarning::new(ParserWarningType::MagicLiteral(Type::Float), token.clone())
-                        .print(self.args.disable_warnings)
+                        .print(&self.args)
                 }
                 Ok(Instruction::new(
                     InstructionType::FloatLiteral(FloatLiteral { value }),
@@ -602,7 +610,7 @@ impl Parser {
                     && !self.args.disable_style_warnings
                 {
                     ParserWarning::new(ParserWarningType::MagicLiteral(Type::Bool), token.clone())
-                        .print(self.args.disable_warnings)
+                        .print(&self.args)
                 }
                 Ok(Instruction::new(
                     InstructionType::BooleanLiteral(BooleanLiteral { value }),
@@ -650,7 +658,7 @@ impl Parser {
                                 ParserWarningType::VariableNotSnakeCase(value.to_string()),
                                 identifier.clone(),
                             )
-                            .print(self.args.disable_warnings)
+                            .print(&self.args)
                         }
                     }
                     true => {
@@ -660,7 +668,7 @@ impl Parser {
                                 ParserWarningType::ConstantNotUpperCase(value.to_string()),
                                 identifier.clone(),
                             )
-                            .print(self.args.disable_warnings)
+                            .print(&self.args)
                         }
                     }
                 }
@@ -838,7 +846,7 @@ impl Parser {
         if let InstructionType::Variable(ref instruction_variable) = instruction.r#type {
             if variable.name == instruction_variable.name {
                 ParserWarning::new(ParserWarningType::SelfAssignment, instruction.token.clone())
-                    .print(self.args.disable_warnings);
+                    .print(&self.args);
             }
         }
 
@@ -934,8 +942,7 @@ impl Parser {
 
         self.environment.remove_scope();
         if statements.is_empty() {
-            ParserWarning::new(ParserWarningType::EmptyBlock, token.clone())
-                .print(self.args.disable_warnings)
+            ParserWarning::new(ParserWarningType::EmptyBlock, token.clone()).print(&self.args)
         }
         Ok(Instruction::new(
             InstructionType::Block(Block { statements }),
@@ -957,10 +964,10 @@ impl Parser {
                 ));
             }
             _ => ParserWarning::new(
-                ParserWarningType::NoBlock(&self.tokens.current().unwrap()),
+                ParserWarningType::NoBlock(Box::new(self.tokens.current().unwrap())),
                 r#if.token.clone(),
             )
-            .print(self.args.disable_warnings || self.args.disable_style_warnings),
+            .print(&self.args),
         }
         let r#else = match &self.peek_next_token()?.r#type {
             TokenType::Keyword { value } => match value.as_str() {
@@ -985,10 +992,10 @@ impl Parser {
             InstructionType::Block(_) => (),
             InstructionType::None => (),
             _ => ParserWarning::new(
-                ParserWarningType::NoBlock(&self.tokens.peek().unwrap()),
+                ParserWarningType::NoBlock(Box::new(self.tokens.peek().unwrap())),
                 r#else.token.clone(),
             )
-            .print(self.args.disable_warnings || self.args.disable_style_warnings),
+            .print(&self.args),
         }
 
         Ok(Instruction::new(
@@ -1063,10 +1070,10 @@ impl Parser {
                 ));
             }
             _ => ParserWarning::new(
-                ParserWarningType::NoBlock(&self.tokens.current().unwrap()),
+                ParserWarningType::NoBlock(Box::new(self.tokens.current().unwrap())),
                 body.token.clone(),
             )
-            .print(self.args.disable_warnings || self.args.disable_style_warnings),
+            .print(&self.args),
         }
 
         self.tokens.back();

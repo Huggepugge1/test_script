@@ -5,29 +5,28 @@ use crate::{
 use super::InstructionResult;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct BooleanLiteral {
-    pub value: bool,
+pub struct RegexLiteral {
+    pub value: Vec<InstructionResult>,
 }
 
-impl std::fmt::Display for BooleanLiteral {
+impl std::fmt::Display for RegexLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        write!(f, "{:?}", self.value)
     }
 }
 
-impl TypeCheck for BooleanLiteral {
+impl TypeCheck for RegexLiteral {
     fn type_check(
         &self,
         _environment: &mut ParserEnvironment,
         _token: &crate::token::Token,
-        _messages: &mut Vec<ParserMessage>,
-    ) -> Type {
-        Type::Bool
+    ) -> Result<Type, Vec<ParserMessage>> {
+        Ok(Type::Regex)
     }
 }
 
-impl BooleanLiteral {
+impl RegexLiteral {
     pub fn interpret(&self) -> InstructionResult {
-        InstructionResult::Bool(self.value)
+        InstructionResult::Regex(self.value.clone())
     }
 }

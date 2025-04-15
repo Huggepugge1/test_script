@@ -1,8 +1,10 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError},
+    error::{InterpreterError, ParserMessage},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
+    token::Token,
     type_checker::TypeCheck,
 };
 
@@ -24,18 +26,19 @@ impl TypeCheck for For {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        token: &crate::token::Token,
-    ) -> Result<Type, ParserError> {
+        token: &Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         environment.add_scope();
-        self.assignment.type_check(environment, token)?;
-        let result = self.body.type_check(environment);
+        self.assignment.type_check(environment, token, messages);
+        let result = self.body.type_check(environment, token, messages);
         environment.remove_scope();
         result
     }
 }
 
-impl For {
-    pub fn interpret(
+impl Interpret for For {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

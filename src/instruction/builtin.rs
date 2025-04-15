@@ -1,6 +1,7 @@
 use crate::{
     environment::ParserEnvironment,
-    error::{InterpreterError, ParserError, ParserErrorType},
+    error::{InterpreterError, ParserMessage},
+    interpreter::Interpret,
     r#type::Type,
     token::Token,
     type_checker::TypeCheck,
@@ -32,12 +33,29 @@ impl std::fmt::Display for BuiltIn {
 impl TypeCheck for BuiltIn {
     fn type_check(
         &self,
-        _environment: &mut ParserEnvironment,
+        environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         match self.name.as_str() {
-            "print" | "println" => self.type_check_print(_environment, token),
-            "input" | "output" => self.type_check_input_output(_environment, token),
+            "print" | "println" => self.type_check_print(environment, token, messages),
+            "input" | "output" => self.type_check_input_output(environment, token, messages),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Interpret for BuiltIn {
+    fn interpret(
+        &self,
+        environment: &mut crate::environment::Environment,
+        process: &mut Option<&mut crate::process::Process>,
+    ) -> Result<InstructionResult, InterpreterError> {
+        match self.name.as_str() {
+            "print" => self.interpret_print(environment, process),
+            "println" => self.interpret_println(environment, process),
+            "input" => self.interpret_input(environment, process),
+            "output" => self.interpret_output(environment, process),
             _ => unreachable!(),
         }
     }
@@ -46,72 +64,52 @@ impl TypeCheck for BuiltIn {
 impl BuiltIn {
     fn type_check_print(
         &self,
-        _environment: &mut ParserEnvironment,
+        environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         if self.arguments.is_empty() {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedNumberOfArguments {
-                    expected: 1,
-                    actual: self.arguments.len(),
-                },
+            messages.push(ParserMessage::error_mismatched_number_of_arguments(
+                1,
+                self.arguments.len(),
                 token.clone(),
             ));
         }
         for arg in &self.arguments {
-            let r#type = arg.type_check(_environment)?;
+            let r#type = arg.type_check(environment, token, messages);
             if r#type != Type::String {
-                return Err(ParserError::new(
-                    ParserErrorType::MismatchedType {
-                        expected: vec![Type::String],
-                        actual: r#type,
-                    },
+                messages.push(ParserMessage::error_mismatched_type(
+                    vec![Type::String],
+                    r#type,
                     token.clone(),
                 ));
             }
         }
-        Ok(Type::None)
+        Type::None
     }
 
     fn type_check_input_output(
         &self,
-        _environment: &mut ParserEnvironment,
+        environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         if self.arguments.len() != 1 {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedNumberOfArguments {
-                    expected: 1,
-                    actual: self.arguments.len(),
-                },
+            messages.push(ParserMessage::error_mismatched_number_of_arguments(
+                1,
+                self.arguments.len(),
                 token.clone(),
             ));
         }
-        let r#type = self.arguments[0].type_check(_environment)?;
+        let r#type = self.arguments[0].type_check(environment, token, messages);
         if r#type != Type::String {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedType {
-                    expected: vec![Type::String],
-                    actual: r#type,
-                },
+            messages.push(ParserMessage::error_mismatched_type(
+                vec![Type::String],
+                r#type,
                 token.clone(),
             ));
         }
-        Ok(Type::None)
-    }
-
-    pub fn interpret(
-        &self,
-        environment: &mut crate::environment::Environment,
-        process: &mut Option<&mut crate::process::Process>,
-    ) -> Result<crate::instruction::InstructionResult, crate::error::InterpreterError> {
-        match self.name.as_str() {
-            "print" => self.interpret_print(environment, process),
-            "println" => self.interpret_println(environment, process),
-            "input" => self.interpret_input(environment, process),
-            "output" => self.interpret_output(environment, process),
-            _ => unreachable!(),
-        }
+        Type::None
     }
 
     fn args_to_string(

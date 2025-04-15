@@ -1,5 +1,5 @@
 use crate::{
-    environment::ParserEnvironment, error::ParserError, r#type::Type, token::Token,
+    environment::ParserEnvironment, error::ParserMessage, r#type::Type, token::Token,
     type_checker::TypeCheck,
 };
 
@@ -21,8 +21,9 @@ impl TypeCheck for StringLiteral {
         &self,
         _environment: &mut ParserEnvironment,
         _token: &Token,
-    ) -> Result<Type, ParserError> {
-        Ok(Type::String)
+        _messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        Type::String
     }
 }
 

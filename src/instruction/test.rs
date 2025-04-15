@@ -1,7 +1,7 @@
 use crate::{
     cli::Args,
     environment::{Environment, ParserEnvironment},
-    error::ParserError,
+    error::ParserMessage,
     interpreter::Test,
     process::Process,
     r#type::Type,
@@ -27,12 +27,13 @@ impl TypeCheck for TestInstruction {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        _token: &crate::token::Token,
-    ) -> Result<Type, ParserError> {
+        token: &crate::token::Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         environment.add_scope();
-        let result = self.body.type_check(environment)?;
+        let result = self.body.type_check(environment, token, messages);
         environment.remove_scope();
-        Ok(result)
+        result
     }
 }
 

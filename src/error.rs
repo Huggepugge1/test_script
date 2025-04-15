@@ -1,7 +1,12 @@
-use crate::instruction::variable::{SnakeCase, Variable};
-use crate::instruction::{Instruction, InstructionResult};
-use crate::r#type::Type;
-use crate::token::{PrintStyle, Token, TokenType};
+use crate::{
+    cli::Args,
+    instruction::{
+        variable::{SnakeCase, Variable},
+        Instruction, InstructionResult,
+    },
+    r#type::Type,
+    token::{PrintStyle, Token, TokenType},
+};
 
 use colored::Colorize;
 use std::path::PathBuf;
@@ -207,13 +212,6 @@ impl ParserError {
         ParserError { r#type, token }
     }
 
-    pub fn none() -> ParserError {
-        ParserError {
-            r#type: ParserErrorType::None,
-            token: Token::none(),
-        }
-    }
-
     pub fn print(&self) {
         if self.r#type == ParserErrorType::None {
             return;
@@ -302,7 +300,7 @@ impl ParserError {
     }
 }
 
-pub enum ParserWarningType<'a> {
+pub enum ParserWarningType {
     TrailingSemicolon,
     EmptyBlock,
 
@@ -316,17 +314,17 @@ pub enum ParserWarningType<'a> {
 
     SelfAssignment,
 
-    NoBlock(&'a Token),
+    NoBlock(Box<Token>),
 
     MagicLiteral(Type),
 }
 
-pub struct ParserWarning<'a> {
-    pub r#type: ParserWarningType<'a>,
+pub struct ParserWarning {
+    pub r#type: ParserWarningType,
     pub token: Token,
 }
 
-impl std::fmt::Display for ParserWarningType<'_> {
+impl std::fmt::Display for ParserWarningType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ParserWarningType::TrailingSemicolon => write!(f, "Trailing semicolon"),
@@ -352,13 +350,13 @@ impl std::fmt::Display for ParserWarningType<'_> {
     }
 }
 
-impl ParserWarning<'_> {
+impl ParserWarning {
     pub fn new(r#type: ParserWarningType, token: Token) -> ParserWarning {
         ParserWarning { r#type, token }
     }
 
-    pub fn print(&self, disable_warnings: bool) {
-        if disable_warnings {
+    pub fn print(&self, args: &Args) {
+        if args.disable_warnings {
             return;
         }
         match &self.r#type {
@@ -501,6 +499,45 @@ impl ParserWarning<'_> {
                 self.token.as_string(PrintStyle::Warning),
                 "consider using a named constant".bright_yellow(),
             ),
+        }
+    }
+}
+
+pub enum ParserMessage {
+    Error(ParserError),
+    Warning(ParserWarning),
+}
+
+impl ParserMessage {
+    pub fn warning_trailing_semicolon(token: Token) -> Self {
+        Self::Warning(ParserWarning {
+            r#type: ParserWarningType::TrailingSemicolon,
+            token,
+        })
+    }
+
+    pub fn error_mismatched_type(expected: Vec<Type>, actual: Type, token: Token) -> Self {
+        Self::Error(ParserError {
+            r#type: ParserErrorType::MismatchedType { expected, actual },
+            token,
+        })
+    }
+
+    pub fn error_mismatched_number_of_arguments(
+        expected: usize,
+        actual: usize,
+        token: Token,
+    ) -> Self {
+        Self::Error(ParserError {
+            r#type: ParserErrorType::MismatchedNumberOfArguments { expected, actual },
+            token,
+        })
+    }
+
+    pub fn print(&self, args: &Args) {
+        match self {
+            ParserMessage::Error(error) => error.print(),
+            ParserMessage::Warning(warning) => warning.print(args),
         }
     }
 }

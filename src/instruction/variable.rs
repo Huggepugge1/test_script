@@ -1,5 +1,5 @@
 use crate::environment::{Environment, ParserEnvironment};
-use crate::error::{InterpreterError, ParserError};
+use crate::error::{InterpreterError, ParserMessage};
 use crate::r#type::Type;
 use crate::token::Token;
 use crate::type_checker::TypeCheck;
@@ -88,13 +88,14 @@ impl TypeCheck for Variable {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        _token: &Token,
-    ) -> Result<Type, ParserError> {
-        Ok(match environment.get(&self.name) {
+        _token: &crate::token::Token,
+        _messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        match environment.get(&self.name) {
             Some(variable) => variable.clone(),
             None => self.clone(),
         }
-        .r#type)
+        .r#type
     }
 }
 

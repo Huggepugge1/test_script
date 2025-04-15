@@ -1,6 +1,6 @@
 use crate::cli::Args;
 use crate::environment::ParserEnvironment;
-use crate::error::ParserError;
+use crate::error::ParserMessage;
 use crate::instruction::Instruction;
 use crate::r#type::Type;
 use crate::token::Token;
@@ -10,13 +10,13 @@ pub trait TypeCheck {
         &self,
         environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError>;
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type;
 }
 
 pub struct TypeChecker {
     program: Vec<Instruction>,
     environment: ParserEnvironment,
-    success: bool,
 }
 
 impl TypeChecker {
@@ -24,17 +24,17 @@ impl TypeChecker {
         Self {
             program,
             environment: ParserEnvironment::new(args.clone()),
-            success: true,
         }
     }
 
-    pub fn check(&mut self) -> Result<(), ParserError> {
+    pub fn check(&mut self) -> Result<(), Vec<ParserMessage>> {
+        let mut result: Vec<ParserMessage> = Vec::new();
         for instruction in self.program.clone() {
-            instruction.type_check(&mut self.environment)?;
+            instruction.type_check(&mut self.environment, &Token::none(), &mut result);
         }
-        match self.success {
+        match result.is_empty() {
             true => Ok(()),
-            false => Err(ParserError::none()),
+            false => Err(result),
         }
     }
 }

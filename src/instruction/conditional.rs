@@ -1,10 +1,12 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError, ParserErrorType},
+    error::{InterpreterError, ParserMessage},
     instruction::InstructionType,
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
     token::Token,
+    type_checker::TypeCheck,
 };
 
 use super::{Instruction, InstructionResult};
@@ -26,37 +28,36 @@ impl std::fmt::Display for Conditional {
     }
 }
 
-impl Conditional {
-    pub fn type_check(
+impl TypeCheck for Conditional {
+    fn type_check(
         &self,
         environment: &mut ParserEnvironment,
         token: &Token,
-    ) -> Result<Type, ParserError> {
-        let condition_type = self.condition.type_check(environment)?;
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        let condition_type = self.condition.type_check(environment, token, messages);
         if condition_type != Type::Bool {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedType {
-                    expected: vec![Type::Bool],
-                    actual: condition_type,
-                },
+            messages.push(ParserMessage::error_mismatched_type(
+                vec![Type::Bool],
+                condition_type.clone(),
                 token.clone(),
             ));
         }
-        let if_type = self.r#if.type_check(environment)?;
-        let else_type = self.r#else.type_check(environment)?;
+        let if_type = self.r#if.type_check(environment, token, messages);
+        let else_type = self.r#else.type_check(environment, token, messages);
         if if_type != else_type {
-            return Err(ParserError::new(
-                ParserErrorType::MismatchedType {
-                    expected: vec![if_type],
-                    actual: condition_type,
-                },
+            messages.push(ParserMessage::error_mismatched_type(
+                vec![if_type.clone()],
+                else_type.clone(),
                 token.clone(),
             ));
         }
-        Ok(if_type)
+        if_type
     }
+}
 
-    pub fn interpret(
+impl Interpret for Conditional {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

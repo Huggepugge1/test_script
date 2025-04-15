@@ -64,13 +64,13 @@ impl ParserEnvironment {
                         ParserWarningType::VariableNotRead,
                         variable.1.last_assignment_token.clone(),
                     )
-                    .print(self.args.disable_warnings);
+                    .print(&self.args);
                 } else {
                     ParserWarning::new(
                         ParserWarningType::UnusedVariable,
                         variable.1.identifier_token.clone(),
                     )
-                    .print(self.args.disable_warnings);
+                    .print(&self.args);
                 }
             }
         }
@@ -86,7 +86,7 @@ impl ParserEnvironment {
                     ParserWarningType::VariableNeverReAssigned,
                     variable.1.declaration_token.clone(),
                 )
-                .print(self.args.disable_warnings);
+                .print(&self.args);
             }
         }
     }

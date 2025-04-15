@@ -1,6 +1,7 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError},
+    error::{InterpreterError, ParserMessage},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
     token::Token,
@@ -24,14 +25,15 @@ impl TypeCheck for Paren {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        _token: &Token,
-    ) -> Result<Type, ParserError> {
-        self.expression.type_check(environment)
+        token: &Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
+        self.expression.type_check(environment, token, messages)
     }
 }
 
-impl Paren {
-    pub fn interpret(
+impl Interpret for Paren {
+    fn interpret(
         &self,
         environment: &mut Environment,
         process: &mut Option<&mut Process>,

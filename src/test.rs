@@ -29,6 +29,24 @@ pub fn run(args: cli::Args) {
         Err(program) => type_checker::TypeChecker::new(program.clone(), args.clone()).check(),
     };
 
+    match program {
+        Ok(_) => {
+            if let Err(errors) = type_check {
+                for error in errors {
+                    error.print(&args);
+                }
+                std::process::exit(ExitCode::TypeCheckerError as i32);
+            }
+        }
+        Err(_) => {
+            if let Err(errors) = type_check {
+                for error in errors {
+                    error.print(&args);
+                }
+            }
+            std::process::exit(ExitCode::ParserError as i32);
+        }
+    }
     if let Ok(program) = program {
         if type_check.is_ok() {
             interpreter::Interpreter::new(program, args).interpret();

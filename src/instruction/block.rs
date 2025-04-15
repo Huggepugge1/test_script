@@ -1,6 +1,7 @@
 use crate::{
     environment::{Environment, ParserEnvironment},
-    error::{InterpreterError, ParserError, ParserWarning, ParserWarningType},
+    error::{InterpreterError, ParserMessage, ParserWarning, ParserWarningType},
+    interpreter::Interpret,
     process::Process,
     r#type::Type,
     type_checker::TypeCheck,
@@ -27,33 +28,23 @@ impl TypeCheck for Block {
     fn type_check(
         &self,
         environment: &mut ParserEnvironment,
-        _token: &crate::token::Token,
-    ) -> Result<Type, ParserError> {
+        token: &crate::token::Token,
+        messages: &mut Vec<ParserMessage>,
+    ) -> Type {
         let mut result = Type::None;
-        let mut failed: Option<ParserError> = None;
         environment.add_scope();
         for (index, statement) in self.statements.iter().enumerate() {
-            match statement.type_check(environment) {
-                Ok(value) => {
-                    if value != Type::None && index != self.statements.len() - 1 {
-                        ParserWarning::new(ParserWarningType::UnusedValue, statement.token.clone())
-                            .print(environment.args.disable_warnings);
-                    }
-                    result = value;
-                }
-                Err(err) => {
-                    if let Some(e) = failed {
-                        e.print();
-                    }
-                    failed = Some(err);
-                }
+            let r#type = statement.type_check(environment, token, messages);
+            if r#type != Type::None && index != self.statements.len() - 1 {
+                messages.push(ParserMessage::Warning(ParserWarning {
+                    r#type: ParserWarningType::UnusedValue,
+                    token: statement.token.clone(),
+                }));
             }
+            result = r#type;
         }
         environment.remove_scope();
-        match failed {
-            Some(err) => Err(err),
-            None => Ok(result),
-        }
+        result
     }
 }
 
