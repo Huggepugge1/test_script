@@ -9,11 +9,15 @@ pub struct Modulo;
 
 impl std::fmt::Display for Modulo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "%")
+        write!(f, "{}", self.operator())
     }
 }
 
 impl BinaryOperationTrait for Modulo {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::Modulo
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![
             (Type::Int, Type::Int),
@@ -44,11 +48,7 @@ impl BinaryOperationTrait for Modulo {
         }
     }
 
-    fn to_u8(&self) -> u8 {
-        BinaryOperator::Modulo.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::Multiplication
+    fn priority(&self) -> u8 {
+        BinaryOperator::Multiplication.to_u8()
     }
 }

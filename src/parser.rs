@@ -5,11 +5,11 @@ use crate::{
     instruction::{
         assignment::{iterable_assignment::IterableAssignment, Assignment},
         binary::{
-            addition::Addition, and::And, division::Division, equality::Equality,
-            greater_than::GreaterThan, greater_than_or_equality::GreaterThanOrEquality,
-            less_than::LessThan, less_than_or_equality::LessThanOrEquality, modulo::Modulo,
-            multiplication::Multiplication, non_equality::NonEquality, or::Or,
-            subtraction::Subtraction, Binary, BinaryOperationTrait,
+            addition::Addition, and::And, division::Division, equal::Equal,
+            greater_than::GreaterThan, greater_than_or_equal::GreaterThanOrEquality,
+            less_than::LessThan, less_than_or_equal::LessThanOrEqual, modulo::Modulo,
+            multiplication::Multiplication, not_equal::NotEqual, or::Or, subtraction::Subtraction,
+            Binary, BinaryOperationTrait,
         },
         block::Block,
         boolean::BooleanLiteral,
@@ -450,12 +450,12 @@ impl Parser {
                 "&&" => Box::new(And) as Box<dyn BinaryOperationTrait>,
                 "||" => Box::new(Or) as Box<dyn BinaryOperationTrait>,
 
-                "==" => Box::new(Equality) as Box<dyn BinaryOperationTrait>,
-                "!=" => Box::new(NonEquality) as Box<dyn BinaryOperationTrait>,
+                "==" => Box::new(Equal) as Box<dyn BinaryOperationTrait>,
+                "!=" => Box::new(NotEqual) as Box<dyn BinaryOperationTrait>,
                 ">" => Box::new(GreaterThan) as Box<dyn BinaryOperationTrait>,
                 ">=" => Box::new(GreaterThanOrEquality) as Box<dyn BinaryOperationTrait>,
                 "<" => Box::new(LessThan) as Box<dyn BinaryOperationTrait>,
-                "<=" => Box::new(LessThanOrEquality) as Box<dyn BinaryOperationTrait>,
+                "<=" => Box::new(LessThanOrEqual) as Box<dyn BinaryOperationTrait>,
 
                 "+" => Box::new(Addition) as Box<dyn BinaryOperationTrait>,
                 "-" => Box::new(Subtraction) as Box<dyn BinaryOperationTrait>,

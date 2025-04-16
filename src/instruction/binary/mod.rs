@@ -1,14 +1,14 @@
 pub mod addition;
 pub mod and;
 pub mod division;
-pub mod equality;
+pub mod equal;
 pub mod greater_than;
-pub mod greater_than_or_equality;
+pub mod greater_than_or_equal;
 pub mod less_than;
-pub mod less_than_or_equality;
+pub mod less_than_or_equal;
 pub mod modulo;
 pub mod multiplication;
-pub mod non_equality;
+pub mod not_equal;
 pub mod or;
 pub mod subtraction;
 
@@ -17,14 +17,14 @@ use std::collections::HashMap;
 use addition::Addition;
 use and::And;
 use division::Division;
-use equality::Equality;
+use equal::Equal;
 use greater_than::GreaterThan;
-use greater_than_or_equality::GreaterThanOrEquality;
+use greater_than_or_equal::GreaterThanOrEquality;
 use less_than::LessThan;
-use less_than_or_equality::LessThanOrEquality;
+use less_than_or_equal::LessThanOrEqual;
 use modulo::Modulo;
 use multiplication::Multiplication;
-use non_equality::NonEquality;
+use not_equal::NotEqual;
 use or::Or;
 use subtraction::Subtraction;
 
@@ -137,19 +137,23 @@ impl std::cmp::PartialOrd for BinaryOperator {
 }
 
 pub trait BinaryOperationTrait: std::fmt::Debug + std::fmt::Display {
+    fn operator(&self) -> BinaryOperator;
+
     fn valid_types(&self) -> Vec<(Type, Type)>;
     fn resulting_types(&self) -> HashMap<(Type, Type), Type>;
 
     fn operate(&self, left: &InstructionResult, right: &InstructionResult) -> InstructionResult;
 
-    fn to_u8(&self) -> u8;
+    fn to_u8(&self) -> u8 {
+        self.operator().to_u8()
+    }
 
-    fn value(&self) -> BinaryOperator;
+    fn priority(&self) -> u8;
 }
 
 impl PartialEq for Box<dyn BinaryOperationTrait> {
     fn eq(&self, other: &Self) -> bool {
-        self.value().to_u8() == other.value().to_u8()
+        self.priority() == other.priority()
     }
 }
 
@@ -169,12 +173,12 @@ impl Clone for Box<dyn BinaryOperationTrait> {
             op if op.to_string() == "&&" => Box::new(And),
             op if op.to_string() == "||" => Box::new(Or),
 
-            op if op.to_string() == "==" => Box::new(Equality),
-            op if op.to_string() == "!=" => Box::new(NonEquality),
+            op if op.to_string() == "==" => Box::new(Equal),
+            op if op.to_string() == "!=" => Box::new(NotEqual),
             op if op.to_string() == ">" => Box::new(GreaterThan),
             op if op.to_string() == ">=" => Box::new(GreaterThanOrEquality),
             op if op.to_string() == "<" => Box::new(LessThan),
-            op if op.to_string() == "<=" => Box::new(LessThanOrEquality),
+            op if op.to_string() == "<=" => Box::new(LessThanOrEqual),
 
             op if op.to_string() == "+" => Box::new(Addition),
             op if op.to_string() == "-" => Box::new(Subtraction),

@@ -9,11 +9,15 @@ pub struct LessThan;
 
 impl std::fmt::Display for LessThan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<")
+        write!(f, "{}", self.operator())
     }
 }
 
 impl BinaryOperationTrait for LessThan {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::LessThan
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![(Type::Int, Type::Int), (Type::Float, Type::Float)]
     }
@@ -37,11 +41,7 @@ impl BinaryOperationTrait for LessThan {
         }
     }
 
-    fn to_u8(&self) -> u8 {
+    fn priority(&self) -> u8 {
         BinaryOperator::Equal.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::Equal
     }
 }

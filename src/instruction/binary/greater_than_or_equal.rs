@@ -5,15 +5,19 @@ use crate::{instruction::InstructionResult, r#type::Type};
 use super::{BinaryOperationTrait, BinaryOperator};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct LessThanOrEquality;
+pub struct GreaterThanOrEquality;
 
-impl std::fmt::Display for LessThanOrEquality {
+impl std::fmt::Display for GreaterThanOrEquality {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, ">")
+        write!(f, "{}", self.operator())
     }
 }
 
-impl BinaryOperationTrait for LessThanOrEquality {
+impl BinaryOperationTrait for GreaterThanOrEquality {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::GreaterThanOrEqual
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![(Type::Int, Type::Int), (Type::Float, Type::Float)]
     }
@@ -37,11 +41,7 @@ impl BinaryOperationTrait for LessThanOrEquality {
         }
     }
 
-    fn to_u8(&self) -> u8 {
+    fn priority(&self) -> u8 {
         BinaryOperator::Equal.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::Equal
     }
 }

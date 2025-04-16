@@ -14,6 +14,10 @@ impl std::fmt::Display for Addition {
 }
 
 impl BinaryOperationTrait for Addition {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::Addition
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![
             (Type::Int, Type::Int),
@@ -45,11 +49,7 @@ impl BinaryOperationTrait for Addition {
         }
     }
 
-    fn to_u8(&self) -> u8 {
+    fn priority(&self) -> u8 {
         BinaryOperator::Addition.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::Addition
     }
 }

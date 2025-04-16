@@ -17,7 +17,7 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(contents: &'a mut str, args: Args) -> Lexer<'a> {
         let lines = contents.lines().map(|s| s.to_string()).collect();
-        let contents = contents.chars().peekable().to_owned().clone();
+        let contents = contents.chars().peekable();
 
         let row = 1;
         let column = 1;

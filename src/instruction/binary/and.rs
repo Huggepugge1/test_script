@@ -9,11 +9,15 @@ pub struct And;
 
 impl std::fmt::Display for And {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "&&")
+        write!(f, "{}", self.operator())
     }
 }
 
 impl BinaryOperationTrait for And {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::And
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![(Type::Bool, Type::Bool)]
     }
@@ -33,11 +37,7 @@ impl BinaryOperationTrait for And {
         }
     }
 
-    fn to_u8(&self) -> u8 {
+    fn priority(&self) -> u8 {
         BinaryOperator::And.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::And
     }
 }

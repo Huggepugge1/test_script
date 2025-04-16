@@ -5,15 +5,19 @@ use crate::{instruction::InstructionResult, r#type::Type};
 use super::{BinaryOperationTrait, BinaryOperator};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Equality;
+pub struct Equal;
 
-impl std::fmt::Display for Equality {
+impl std::fmt::Display for Equal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "==")
+        write!(f, "{}", self.operator())
     }
 }
 
-impl BinaryOperationTrait for Equality {
+impl BinaryOperationTrait for Equal {
+    fn operator(&self) -> BinaryOperator {
+        BinaryOperator::Equal
+    }
+
     fn valid_types(&self) -> Vec<(Type, Type)> {
         vec![
             (Type::Int, Type::Int),
@@ -50,11 +54,7 @@ impl BinaryOperationTrait for Equality {
         }
     }
 
-    fn to_u8(&self) -> u8 {
+    fn priority(&self) -> u8 {
         BinaryOperator::Equal.to_u8()
-    }
-
-    fn value(&self) -> BinaryOperator {
-        BinaryOperator::Equal
     }
 }
